@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Free Eight - Online</title>
+<style>
+/* ベーススタイル */
+* { box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', 'Hiragino Sans', sans-serif;
+  background: linear-gradient(135deg, #0c1a2b 0%, #1a2a4a 100%);
+  color: #e0e6f0;
+  text-align: center;
+  padding: 20px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+h1 {
+  margin-bottom: 10px;
+  font-size: 2.5em;
+  text-shadow: 0 2px 10px rgba(74,163,255,0.3);
+}
+
+.muted { opacity: .8; font-size: .9em; }
+
+/* パネル */
+.panel {
+  background: linear-gradient(145deg, #14233b 0%, #1b2e50 100%);
+  border: 1px solid #2c3f5f;
+  border-radius: 12px;
+  padding: 15px;
+  margin: 12px auto;
+  max-width: 980px;
+  transition: all 0.3s ease;
+}
+
+/* ボタン */
+button {
+  margin: 5px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #1b2e50 0%, #2a4070 100%);
+  color: #fff;
+  border: 1px solid #445;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+button:hover {
+  background: linear-gradient(145deg, #2a4070 0%, #3a5090 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(74,163,255,0.3);
+}
+button:active {
+  transform: translateY(0);
+}
+button[disabled] {
+  opacity: .5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* インプット */
+input {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #445;
+  background: #0f1c2c;
+  color: #e0e6f0;
+  margin: 0 4px;
+  font-size: 14px;
+}
+input:focus {
+  outline: none;
+  border-color: #4aa3ff;
+  box-shadow: 0 0 8px rgba(74,163,255,0.3);
+}
+
+/* カード */
+.card {
+  display: inline-block;
+  margin: 4px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #fff 0%, #f0f0f0 100%);
+  color: #000;
+  min-width: 50px;
+  font-size: 18px;
+  font-weight: bold;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.1);
+  transition: all 0.2s ease;
+  user-select: none;
+}
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+}
+.card.puttable {
+  box-shadow: 0 0 15px 5px rgba(122, 224, 184, 0.6), 0 2px 6px rgba(0,0,0,0.2);
+  cursor: pointer;
+  animation: cardPulse 1.5s ease-in-out infinite;
+}
+.card.puttable:hover {
+  transform: translateY(-8px) scale(1.05);
+  box-shadow: 0 0 20px 8px rgba(122, 224, 184, 0.8), 0 8px 20px rgba(0,0,0,0.3);
+}
+@keyframes cardPulse {
+  0%, 100% { box-shadow: 0 0 15px 5px rgba(122, 224, 184, 0.5); }
+  50% { box-shadow: 0 0 20px 8px rgba(122, 224, 184, 0.8); }
+}
+
+.card-back {
+  display: inline-block;
+  padding: 12px 16px;
+  background: linear-gradient(145deg, #2a3a5a 0%, #1a2a4a 100%);
+  color: #8899bb;
+  border-radius: 10px;
+  font-size: 16px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.suit-red { color: #d1182a; }
+.suit-black { color: #1a1a2e; }
+
+/* ===== ターン表示の改善 ===== */
+.turn-hot {
+  background: linear-gradient(145deg, #1a3a2a 0%, #2a5a4a 100%) !important;
+  border: 2px solid #4ade80 !important;
+  box-shadow: 0 0 20px rgba(74, 222, 128, 0.4), 0 0 40px rgba(74, 222, 128, 0.2);
+  animation: turnGlow 2s ease-in-out infinite;
+}
+@keyframes turnGlow {
+  0%, 100% { box-shadow: 0 0 20px rgba(74, 222, 128, 0.4); }
+  50% { box-shadow: 0 0 30px rgba(74, 222, 128, 0.6), 0 0 50px rgba(74, 222, 128, 0.3); }
+}
+
+/* ターンバナー */
+.turn-banner {
+  display: none;
+  background: linear-gradient(90deg, #10b981 0%, #34d399 50%, #10b981 100%);
+  background-size: 200% 100%;
+  color: #fff;
+  font-weight: bold;
+  font-size: 16px;
+  padding: 8px 20px;
+  border-radius: 20px;
+  margin-bottom: 10px;
+  animation: bannerSlide 2s linear infinite, bannerPop 0.5s ease-out;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.5);
+}
+.turn-banner.active {
+  display: inline-block;
+}
+@keyframes bannerSlide {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@keyframes bannerPop {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* 他プレイヤーのターン表示 */
+.opponent-turn-indicator {
+  display: none;
+  background: #f59e0b;
+  color: #fff;
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  margin-left: 8px;
+  animation: pulse 1s ease-in-out infinite;
+}
+.opponent-turn-indicator.active {
+  display: inline-block;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* 攻撃表示 */
+.attack-field {
+  display: inline-block;
+  background: linear-gradient(90deg, #dc2626 0%, #ef4444 100%);
+  color: #fff;
+  font-weight: bold;
+  padding: 6px 12px;
+  border-radius: 8px;
+  margin-left: 10px;
+  animation: flash .8s ease-in-out infinite alternate;
+}
+
+/* マーク選択 */
+.suit-select {
+  margin-top: 15px;
+  padding: 15px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 10px;
+  animation: flash 1s ease-in-out infinite alternate;
+}
+.suit-btn {
+  margin: 8px;
+  padding: 15px 24px;
+  border-radius: 12px;
+  border: 2px solid #999;
+  cursor: pointer;
+  font-size: 28px;
+  transition: all 0.2s ease;
+}
+.suit-btn:hover {
+  transform: scale(1.1);
+}
+.suit-btn.red {
+  color: #d1182a;
+  background: linear-gradient(145deg, #fff0f0 0%, #ffe0e0 100%);
+  border-color: #f99;
+}
+.suit-btn.black {
+  color: #1a1a2e;
+  background: linear-gradient(145deg, #f5f5f5 0%, #e5e5e5 100%);
+  border-color: #ccc;
+}
+
+/* スコアボード */
+.scoreboard {
+  background: linear-gradient(145deg, #11263a 0%, #1a3050 100%);
+  border-radius: 12px;
+  padding: 15px;
+  margin: 15px auto;
+  max-width: 980px;
+}
+.ranktable {
+  margin: auto;
+  border-collapse: collapse;
+  color: #fff;
+  width: 90%;
+}
+.ranktable td, .ranktable th {
+  border-bottom: 1px solid #335;
+  padding: 10px 12px;
+}
+.ranktable th {
+  background: #1b2e50;
+}
+.ranktable tr:hover td {
+  background: rgba(74,163,255,0.1);
+}
+
+/* 勝者表示 */
+.winner {
+  background: linear-gradient(145deg, #103020 0%, #1a4a30 100%);
+  border: 2px solid #4ade80;
+  color: #9f9;
+  padding: 15px;
+  margin: 15px auto;
+  border-radius: 12px;
+  max-width: 980px;
+}
+
+/* 手札開示 */
+.reveal {
+  background: linear-gradient(145deg, #0f2136 0%, #1a3050 100%);
+  border: 1px solid #2b4770;
+  border-radius: 12px;
+  padding: 15px;
+  margin: 15px auto;
+  max-width: 980px;
+  text-align: left;
+}
+.reveal h3 {
+  margin: 8px 0;
+  font-size: 16px;
+  color: #bfe0ff;
+}
+.reveal .row {
+  margin: 8px 0;
+  padding: 10px;
+  background: rgba(0,0,0,0.2);
+  border-radius: 8px;
+}
+
+@keyframes flash {
+  from { opacity: 0.7; transform: scale(1); }
+  to { opacity: 1; transform: scale(1.02); }
+}
+
+/* RON モーダル */
+#ronModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+#ronBox {
+  background: linear-gradient(145deg, #0f2136 0%, #1a3050 100%);
+  border: 2px solid #4aa3ff;
+  border-radius: 16px;
+  padding: 25px;
+  max-width: 520px;
+  width: 92%;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+}
+#ronBox h3 {
+  margin: 0 0 12px;
+  font-size: 24px;
+  color: #ff6b6b;
+}
+
+/* 終局オーバーレイ */
+#resultOverlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9998;
+  background: rgba(0,0,0,.75);
+  backdrop-filter: blur(6px);
+}
+#resultCard {
+  background: linear-gradient(145deg, #0f2136 0%, #1a3050 100%);
+  border: 3px solid #4aa3ff;
+  border-radius: 20px;
+  padding: 30px;
+  max-width: 760px;
+  width: 92%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  transform: scale(.9);
+  opacity: 0;
+  animation: popIn .4s ease-out forwards;
+}
+#resultTitle {
+  font-size: 48px;
+  letter-spacing: .15em;
+  margin: 0 0 12px;
+  text-shadow: 0 4px 20px rgba(74,163,255,0.5);
+}
+#resultSub {
+  font-size: 18px;
+  color: #cde6ff;
+  margin: 0 0 20px;
+}
+#resultTable {
+  margin: 15px auto 0;
+  text-align: left;
+  max-height: 60vh;
+  overflow: auto;
+}
+#resultTable h3 {
+  margin: 12px 0 8px;
+  color: #bfe0ff;
+}
+#resultClose {
+  margin-top: 20px;
+  padding: 12px 30px;
+  font-size: 16px;
+}
+@keyframes popIn {
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* ツモ：青 */
+.title-tsumo {
+  color: #4aa3ff;
+  text-shadow: 0 0 15px rgba(74,163,255,.7), 0 0 30px rgba(74,163,255,.4);
+  animation: tsumoPop .6s ease-out;
+}
+@keyframes tsumoPop {
+  0% { transform: scale(.8); opacity: .3; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+/* ロン：赤 */
+.title-ron {
+  color: #ff4a4a;
+  text-shadow: 0 0 15px rgba(255,74,74,.6), 0 0 30px rgba(255,74,74,.3);
+  animation: ronShake .4s ease-in-out, ronPulse 1.2s ease-in-out .4s infinite;
+}
+@keyframes ronShake {
+  0%,100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(2px); }
+}
+@keyframes ronPulse {
+  0%,100% { text-shadow: 0 0 10px rgba(255,74,74,.5); }
+  50% { text-shadow: 0 0 25px rgba(255,74,74,.9); }
+}
+
+/* ロン返し */
+.title-ronrev {
+  color: #ffd94a;
+  letter-spacing: .1em;
+  text-shadow: 0 0 15px rgba(255,217,74,.8), 0 0 35px rgba(255,255,255,.4);
+  animation: ronrevBoom .5s ease-out;
+}
+@keyframes ronrevBoom {
+  0% { transform: scale(.6); filter: brightness(1.3); opacity: .3; }
+  60% { transform: scale(1.1); filter: brightness(1.8); opacity: 1; }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+/* 雷FX */
+#thunderFX {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: none;
+}
+.thunder-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgba(255,255,255,.8), rgba(255,255,255,0) 60%);
+  animation: flashBlink .25s ease-out;
+}
+@keyframes flashBlink {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.bolt {
+  position: absolute;
+  width: 10px;
+  height: 40vh;
+  background: linear-gradient(#fff, #ffe36a);
+  filter: drop-shadow(0 0 10px #fff) drop-shadow(0 0 18px #ffe36a);
+  clip-path: polygon(40% 0, 60% 0, 52% 18%, 70% 18%, 34% 60%, 54% 60%, 30% 100%, 10% 100%, 28% 66%, 8% 66%, 44% 24%, 26% 24%);
+  opacity: 0;
+  animation: boltStrike .4s ease-out forwards;
+}
+.bolt.b2 { left: 68%; top: -8vh; transform: rotate(6deg); animation-delay: .08s; }
+.bolt.b1 { left: 28%; top: -6vh; transform: rotate(-4deg); }
+@keyframes boltStrike {
+  0% { opacity: 0; transform: translateY(-12vh) scaleY(.8); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(12vh) scaleY(1); }
+}
+
+/* 山札表示 */
+#deckInfo {
+  font-size: 18px;
+  margin: 10px 0;
+  padding: 8px 16px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+  display: inline-block;
+}
+
+/* 場のカード */
+.field-card {
+  display: inline-block;
+  padding: 20px 28px;
+  font-size: 28px;
+  font-weight: bold;
+  background: linear-gradient(145deg, #fff 0%, #f0f0f0 100%);
+  border-radius: 14px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3), 0 0 30px rgba(74,163,255,0.2);
+}
+</style>
+</head>
+<body>
+<h1>Free Eight</h1>
+
+<div class="panel">
+  ルーム: <input id="roomId" value="" placeholder="room123456" />
+  名前: <input id="name" value="Guest" placeholder="あなたの名前" />
+  <button id="joinBtn">入室</button>
+  <button id="startBtn">開始(投票)</button>
+  <button id="restartBtn" style="display:none;">リスタート(投票)</button>
+  <div id="info" class="muted" style="margin-top:8px;"></div>
+</div>
+
+<div id="deckInfo" class="muted"></div>
+<div id="gameArea"></div>
+
+<div id="scoreBoard" class="scoreboard"></div>
+<div id="gameOverPane"></div>
+
+<!-- RON モーダル -->
+<div id="ronModal">
+  <div id="ronBox">
+    <h3>ロン条件一致</h3>
+    <div id="ronMsg" class="muted" style="margin:8px 0 12px"></div>
+    <div id="ronCard" style="margin:8px 0;"></div>
+    <div id="ronMyHand" style="margin:8px 0 12px;"></div>
+    <div id="ronTimer" class="muted" style="margin:8px 0 12px; font-size: 20px;"></div>
+    <div>
+      <button id="ronYes" style="background: linear-gradient(145deg, #dc2626, #ef4444);">ロンする</button>
+      <button id="ronNo">続行する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 終局オーバーレイ -->
+<div id="resultOverlay">
+  <div id="thunderFX"></div>
+  <div id="resultCard">
+    <div id="resultTitle">ツモ</div>
+    <div id="resultSub"></div>
+    <div id="resultTable"></div>
+    <div><button id="resultClose">閉じる</button></div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+(() => {
+  // クライアントID管理
+  const LS_KEY_ID = "fe_client_id_v1";
+  let clientId = localStorage.getItem(LS_KEY_ID);
+  if (!clientId) {
+    clientId = crypto.randomUUID ? crypto.randomUUID() : 'c_' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    localStorage.setItem(LS_KEY_ID, clientId);
+  }
+  window.FE_CLIENT_ID = clientId;
+
+  const socket = io();
+
+  const roomIdInput = document.getElementById("roomId");
+  const nameInput = document.getElementById("name");
+  const joinBtn = document.getElementById("joinBtn");
+  const startBtn = document.getElementById("startBtn");
+  const restartBtn = document.getElementById("restartBtn");
+
+  function genDefaultRoomId() {
+    return 'room' + (100000 + Math.floor(Math.random() * 900000));
+  }
+
+  if (!roomIdInput.value) {
+    roomIdInput.value = genDefaultRoomId();
+  }
+
+  let state = null, myHand = [], mySeat = null, roomId = null;
+  let lastGame = null;
+  let freezeActive = false;
+
+  socket.on("freeze", ({active}) => { freezeActive = !!active; });
+
+  socket.on("connect", () => {
+    const saved = localStorage.getItem('fe_last_session');
+    const cid = window.FE_CLIENT_ID || null;
+    if (saved) {
+      try {
+        const { roomId: rid, name } = JSON.parse(saved) || {};
+        socket.emit("joinRoom", { roomId: rid || "", name: name || "", clientId: cid });
+        return;
+      } catch (_) {}
+    }
+    socket.emit("joinRoom", { roomId: "", name: "", clientId: cid });
+  });
+
+  joinBtn.onclick = () => {
+    if (freezeActive) return;
+    const typed = (roomIdInput.value || '').trim();
+    const rid = typed || genDefaultRoomId();
+    const name = (nameInput.value || 'Guest').trim();
+    roomId = rid;
+    socket.emit('joinRoom', { roomId: rid, name, clientId: window.FE_CLIENT_ID || null });
+    roomIdInput.value = rid;
+  };
+
+  socket.on("you", ({ seat, name, roomId: rid }) => {
+    mySeat = seat;
+    roomId = rid;
+    roomIdInput.value = rid;
+    localStorage.setItem('fe_last_session', JSON.stringify({ roomId: rid, name: name || '' }));
+  });
+
+  startBtn.onclick = () => {
+    if (!roomId || freezeActive) return;
+    startBtn.disabled = true;
+    socket.emit("requestStart", { roomId });
+  };
+
+  restartBtn.onclick = () => {
+    if (!roomId || freezeActive) return;
+    restartBtn.disabled = true;
+    socket.emit("requestRestart", { roomId });
+  };
+
+  const suitClass = s => (s === "♥" || s === "♦") ? "suit-red" : "suit-black";
+
+  function seatName(seat) {
+    const p = (state?.players || []).find(x => x.seat === seat);
+    return p ? (p.name || `Player${p.seat}`) : `Player${seat}`;
+  }
+
+  function cardSpan(card, isField = false) {
+    const r = card.replace(/[♠♥♦♣]/g, "");
+    const s = (card.match(/[♠♥♦♣]/) || [""])[0];
+    const colorClass = (s === "♥" || s === "♦") ? "suit-red" : "suit-black";
+    const baseClass = isField ? "field-card" : "card";
+    return `<span class="${baseClass} ${colorClass}">${r}${s}</span>`;
+  }
+
+  function cardSpanPlayable(card, idx, can) {
+    const r = card.replace(/[♠♥♦♣]/g, "");
+    const s = (card.match(/[♠♥♦♣]/) || [""])[0];
+    const colorClass = (s === "♥" || s === "♦") ? "suit-red" : "suit-black";
+    const cls = can ? `card ${colorClass} puttable` : `card ${colorClass}`;
+    return `<span class="${cls}" data-idx="${idx}">${r}${s}</span>`;
+  }
+
+  // スコアボード描画
+  function renderScoreBoard(players, totals, round) {
+    if (!players) return;
+    const bySeat = [...players].sort((a, b) => a.seat - b.seat);
+    const rows = bySeat.map(p => ({
+      seat: p.seat,
+      name: p.name || `Player${p.seat}`,
+      total: totals?.[p.seat - 1] ?? 0,
+      delta: round?.[p.seat - 1] ?? 0
+    })).sort((a, b) => b.total - a.total);
+
+    let rank = 1;
+    const now = new Date();
+    const timeStr = now.toLocaleString("ja-JP", {
+      month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    });
+
+    let html = `
+      <div style="margin:4px 0 10px;">
+        <b>ルーム:</b> ${state?.roomId ?? '-'}
+        <span style="font-size:0.9em;opacity:0.7;margin-left:10px;">(${timeStr})</span>
+      </div>
+      <b style="font-size:18px;">総合スコア</b><br>
+      <table class="ranktable">
+        <tr><th>順位</th><th>プレイヤー</th><th>今回</th><th>合計</th></tr>`;
+
+    rows.forEach((r, idx) => {
+      if (idx > 0 && r.total < rows[idx - 1].total) rank = idx + 1;
+      const delta = r.delta === 0 ? "±0" : (r.delta > 0 ? `+${Math.round(r.delta)}` : `${Math.round(r.delta)}`);
+      const deltaColor = r.delta > 0 ? 'color:#4ade80;' : (r.delta < 0 ? 'color:#f87171;' : '');
+      html += `<tr><td>${rank}</td><td>${r.name}</td><td style="${deltaColor}">${delta}</td><td>${Math.round(r.total)}</td></tr>`;
+    });
+
+    html += "</table>";
+    document.getElementById("scoreBoard").innerHTML = html;
+  }
+
+  function renderGameOverPane() {
+    const pane = document.getElementById("gameOverPane");
+    if (!lastGame) { pane.innerHTML = ""; return; }
+
+    const kanaTitle = lastGame.reason === "TSUMO" || lastGame.reason === "ツモ" ? "ツモ" : "ロン";
+    const winners = [];
+    if (kanaTitle === "ツモ") {
+      if (lastGame.winnerSeat) winners.push(seatName(lastGame.winnerSeat));
+    } else {
+      const tos = new Set((lastGame.scores || []).filter(s => /RON|ロン/.test(s.reason || "")).map(s => s.toSeat));
+      for (const idx of tos) { winners.push(seatName((idx ?? 0) + 1)); }
+    }
+    const winnerLine = winners.length ? ` / Winner: ${winners.join(", ")}` : "";
+
+    let html = `<div class="winner"><b>Game Over</b> : ${kanaTitle}${winnerLine}</div>`;
+    if (lastGame.scores && lastGame.scores.length) {
+      html += `<div class="panel"><b>得点内訳</b><br>`;
+      html += lastGame.scores.map(s => `${seatName(s.fromSeat + 1)} → ${seatName(s.toSeat + 1)} : ${s.amount} 点 (${s.reason})`).join("<br>");
+      html += `</div>`;
+    }
+    if (lastGame.reveals && lastGame.reveals.length) {
+      html += `<div class="reveal"><h3>点数計算に使用した手札の開示</h3>`;
+      lastGame.reveals.forEach(r => {
+        let label = r.role === "tsumo_winner" ? `${seatName(r.seat)}（勝者の手札）` :
+                    r.role === "ron_winner" ? `${seatName(r.seat)}（ロン者の手札）` :
+                    `${seatName(r.seat)}`;
+        html += `<div class="row"><b>${label}</b><div>${(r.hand || []).map(c => cardSpan(c)).join("")}</div></div>`;
+      });
+      html += `</div>`;
+    }
+    pane.innerHTML = html;
+  }
+
+  // 結果オーバーレイ
+  const resultOverlay = document.getElementById("resultOverlay");
+  const resultTitle = document.getElementById("resultTitle");
+  const resultSub = document.getElementById("resultSub");
+  const resultTable = document.getElementById("resultTable");
+  const resultClose = document.getElementById("resultClose");
+
+  function showResultOverlay(payload) {
+    const isTsumo = /^(TSUMO|ツモ)$/.test(payload.reason);
+    const hasRonReverse = Array.isArray(payload.scores) && payload.scores.some(s => /ロン返し/.test(s.reason || ""));
+    const titleEl = document.getElementById("resultTitle");
+    const thunder = document.getElementById("thunderFX");
+
+    titleEl.classList.remove("title-tsumo", "title-ron", "title-ronrev");
+    thunder.style.display = "none";
+    thunder.innerHTML = "";
+
+    if (isTsumo) {
+      titleEl.textContent = "ツモ";
+      titleEl.classList.add("title-tsumo");
+    } else if (hasRonReverse) {
+      titleEl.innerHTML = "ロン返し<br>発生！！";
+      titleEl.classList.add("title-ronrev");
+      thunder.style.display = "block";
+      thunder.innerHTML = `
+        <div class="thunder-flash"></div>
+        <div class="bolt b1" style="--r:-6deg;"></div>
+        <div class="bolt b2" style="--r:5deg;"></div>
+      `;
+    } else {
+      titleEl.textContent = "ロン";
+      titleEl.classList.add("title-ron");
+    }
+
+    const winners = [];
+    if (isTsumo) {
+      if (payload.winnerSeat) winners.push(seatName(payload.winnerSeat));
+    } else {
+      const tos = new Set((payload.scores || []).filter(s => /RON|ロン/.test(s.reason || "")).map(s => s.toSeat));
+      for (const idx of tos) { winners.push(seatName((idx ?? 0) + 1)); }
+    }
+    resultSub.textContent = winners.length ? `Winner: ${winners.join(", ")}` : "";
+
+    let html = "";
+    if (payload.scores && payload.scores.length) {
+      html += `<h3>得点内訳</h3>`;
+      html += payload.scores.map(s => `${seatName(s.fromSeat + 1)} → ${seatName(s.toSeat + 1)} : ${s.amount} 点 (${s.reason})`).join("<br>");
+    }
+    if (payload.reveals && payload.reveals.length) {
+      html += `<h3 style="margin-top:12px">点数計算に使用した手札</h3>`;
+      html += payload.reveals.map(r => {
+        let label = r.role === "tsumo_winner" ? `${seatName(r.seat)}（勝者）` :
+                    r.role === "ron_winner" ? `${seatName(r.seat)}（ロン者）` :
+                    `${seatName(r.seat)}`;
+        return `<div style="margin:8px 0;"><b>${label}</b><div>${(r.hand || []).map(c => cardSpan(c)).join("")}</div></div>`;
+      }).join("");
+    }
+    resultTable.innerHTML = html || "<div class='muted'>（情報なし）</div>";
+    resultOverlay.style.display = "flex";
+  }
+
+  resultClose.onclick = () => { resultOverlay.style.display = "none"; };
+
+  // メイン描画
+  function render() {
+    if (!state) return;
+
+    document.getElementById("info").textContent =
+      `${state.roomId} / ${state.started ? (state.finished ? "終了" : "プレイ中") : "待機中"} / 参加者:${(state.players || []).length}`;
+    document.getElementById("deckInfo").textContent = `山札: ${state.deckCount ?? 0} 枚`;
+
+    if (state.start?.awaiting) {
+      startBtn.disabled = false;
+      startBtn.textContent = `開始(投票) Ready ${state.start.voteCount}/${state.start.total}`;
+    } else {
+      startBtn.textContent = "開始(投票)";
+      startBtn.disabled = !!state.started;
+    }
+
+    if (state.finished && state.restart?.awaiting) {
+      restartBtn.style.display = "inline-block";
+      restartBtn.disabled = false;
+      restartBtn.textContent = `リスタート(投票) Ready ${state.restart.voteCount}/${state.restart.total}`;
+    } else {
+      restartBtn.style.display = "none";
+    }
+
+    // 場のカード
+    let html = `<div class="panel"><b>場:</b> ${state.discardTop ? cardSpan(state.discardTop, true) : "(なし)"}`;
+    if (state.forcedAttack) html += `<span class="attack-field">攻撃中 ×${state.forcedAttack.draw}枚！</span>`;
+    if (state.requiredSuit) html += `<span style="color:#ffd166;font-weight:bold;margin-left:12px;">指定マーク: ${state.requiredSuit}</span>`;
+    html += `</div>`;
+
+    // マーク選択
+    if (state.pendingSuitChooser && mySeat === state.pendingSuitChooser) {
+      html += `<div class="suit-select"><p><strong>8 のマークを選択：</strong></p>
+        <button class="suit-btn black" onclick="chooseSuit('♠')">♠</button>
+        <button class="suit-btn red" onclick="chooseSuit('♥')">♥</button>
+        <button class="suit-btn red" onclick="chooseSuit('♦')">♦</button>
+        <button class="suit-btn black" onclick="chooseSuit('♣')">♣</button>
+      </div>`;
+    }
+
+    // プレイヤーパネル
+    html += (state.players || []).map(p => {
+      const isMyTurn = p.seat === mySeat && p.isTurn;
+      const hot = p.isTurn ? " turn-hot" : "";
+      const display = p.name || `Player${p.seat}`;
+
+      if (p.seat === mySeat) {
+        const cards = myHand.length
+          ? myHand.map((c, i) => cardSpanPlayable(c, i, false)).join("")
+          : `<span class="card-back">（手札なし）</span>`;
+
+        return `<div class="panel${hot}" id="panel-seat-${p.seat}">
+          <div class="turn-banner ${isMyTurn ? 'active' : ''}">あなたのターン！</div>
+          <b style="font-size:18px;">${display} (You)</b>
+          <br>
+          <div id="my-hand" style="margin:12px 0;">${cards}</div>
+          <div style="margin-top:10px;">
+            <button id="drawBtn" style="padding:12px 24px;font-size:16px;">カードを引く</button>
+          </div>
+        </div>`;
+      } else {
+        return `<div class="panel${hot}">
+          <b style="font-size:16px;">${display}</b>
+          <span class="opponent-turn-indicator ${p.isTurn ? 'active' : ''}">思考中...</span>
+          <br>
+          <span class="card-back" style="margin-top:8px;display:inline-block;">×${p.handCount}</span>
+        </div>`;
+      }
+    }).join("");
+
+    document.getElementById("gameArea").innerHTML = html;
+
+    // Draw ボタン設定
+    const me = (state.players || []).find(pp => pp.seat === mySeat);
+    const myTurn = !!(me && me.isTurn);
+    const drawBtn = document.getElementById("drawBtn");
+    if (drawBtn) {
+      drawBtn.onclick = () => {
+        if (freezeActive) return;
+        roomId && socket.emit("move", { roomId, move: { type: "draw" } });
+      };
+      drawBtn.disabled = !myTurn || state.finished || !!state.pendingSuitChooser;
+    }
+
+    renderScoreBoard(state.players, state.sessionScores, state.lastRoundScores);
+    renderGameOverPane();
+  }
+
+  // カードクリック
+  document.addEventListener("click", (ev) => {
+    const cont = document.querySelector("#my-hand");
+    if (!cont) return;
+    const el = ev.target.closest(".card.puttable[data-idx]");
+    if (!el || !cont.contains(el)) return;
+    if (freezeActive) return;
+    const idx = Number(el.dataset.idx);
+    if (Number.isInteger(idx) && roomId) {
+      socket.emit("move", { roomId, move: { type: "play", index: idx } });
+    }
+  });
+
+  socket.on("state", (s) => { state = s; render(); });
+  socket.on("hand", ({ hand }) => { myHand = hand || []; render(); });
+  socket.on("playHints", ({ puttableIdx, canDraw, mustChoose }) => {
+    document.querySelectorAll("#my-hand .card").forEach((el, idx) => {
+      el.dataset.idx = idx;
+      if (puttableIdx.includes(idx)) el.classList.add("puttable");
+      else el.classList.remove("puttable");
+    });
+    const drawBtn = document.getElementById("drawBtn");
+    if (drawBtn) drawBtn.disabled = !canDraw || mustChoose || state?.finished;
+  });
+
+  // RON モーダル
+  const ronModal = document.getElementById("ronModal");
+  const ronMsg = document.getElementById("ronMsg");
+  const ronCard = document.getElementById("ronCard");
+  const ronTimer = document.getElementById("ronTimer");
+  const ronYes = document.getElementById("ronYes");
+  const ronNo = document.getElementById("ronNo");
+  const ronMyHand = document.getElementById("ronMyHand");
+  let ronPending = null;
+  let ronTickId = null;
+
+  socket.on("ronOffer", ({ card, loserSeat, yourSeat, deadline }) => {
+    ronPending = { card, loserSeat, deadline: Number(deadline) || (Date.now() + 5000) };
+    const who = (state?.players || []).find(p => p.seat === yourSeat)?.name || `Player${yourSeat}`;
+    const loser = (state?.players || []).find(p => p.seat === loserSeat)?.name || `Player${loserSeat}`;
+    ronMsg.innerHTML = `<b>${who}</b>：<br>放銃者 ${loser}<br>ロンしますか？`;
+    ronCard.innerHTML = cardSpan(card, true);
+    ronMyHand.innerHTML = `<b>あなたの手札：</b><br>${(myHand || []).map(c => cardSpan(c)).join(" ") || "(なし)"}`;
+    ronModal.style.display = "flex";
+
+    if (ronTickId) clearInterval(ronTickId);
+    const tick = () => {
+      const remain = Math.max(0, ronPending.deadline - Date.now());
+      const sec = Math.ceil(remain / 1000);
+      ronTimer.textContent = `残り ${sec} 秒`;
+      if (remain <= 0) {
+        socket.emit("move", { roomId, move: { type: "noRon" } });
+        closeRon();
+      }
+    };
+    tick();
+    ronTickId = setInterval(tick, 250);
+  });
+
+  function closeRon() {
+    if (ronTickId) { clearInterval(ronTickId); ronTickId = null; }
+    ronPending = null;
+    ronModal.style.display = "none";
+    ronTimer.textContent = "";
+    ronCard.innerHTML = "";
+  }
+
+  ronYes.onclick = () => {
+    if (!ronPending) return;
+    socket.emit("move", { roomId, move: { type: "ron" } });
+    closeRon();
+  };
+  ronNo.onclick = () => {
+    if (!ronPending) return;
+    socket.emit("move", { roomId, move: { type: "noRon" } });
+    closeRon();
+  };
+
+  socket.on("gameOver", (payload) => {
+    lastGame = payload;
+    renderGameOverPane();
+    renderScoreBoard(state?.players, payload.sessionScores, payload.lastRoundScores);
+    showResultOverlay(payload);
+  });
+
+  window.chooseSuit = suit => {
+    if (freezeActive) return;
+    roomId && socket.emit("move", { roomId, move: { type: "chooseSuit", suit } });
+  };
+})();
+</script>
+</body>
+</html>

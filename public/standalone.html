@@ -1,0 +1,668 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Free Eight - Standalone Demo</title>
+<style>
+/* ベーススタイル */
+* { box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', 'Hiragino Sans', sans-serif;
+  background: linear-gradient(135deg, #0c1a2b 0%, #1a2a4a 100%);
+  color: #e0e6f0;
+  text-align: center;
+  padding: 20px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+h1 {
+  margin-bottom: 10px;
+  font-size: 2.5em;
+  text-shadow: 0 2px 10px rgba(74,163,255,0.3);
+}
+
+.muted { opacity: .8; font-size: .9em; }
+
+/* パネル */
+.panel {
+  background: linear-gradient(145deg, #14233b 0%, #1b2e50 100%);
+  border: 1px solid #2c3f5f;
+  border-radius: 12px;
+  padding: 15px;
+  margin: 12px auto;
+  max-width: 980px;
+  transition: all 0.3s ease;
+}
+
+/* ボタン */
+button {
+  margin: 5px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #1b2e50 0%, #2a4070 100%);
+  color: #fff;
+  border: 1px solid #445;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+button:hover {
+  background: linear-gradient(145deg, #2a4070 0%, #3a5090 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(74,163,255,0.3);
+}
+button:active {
+  transform: translateY(0);
+}
+button[disabled] {
+  opacity: .5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* カード */
+.card {
+  display: inline-block;
+  margin: 4px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #fff 0%, #f0f0f0 100%);
+  color: #000;
+  min-width: 50px;
+  font-size: 18px;
+  font-weight: bold;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.1);
+  transition: all 0.2s ease;
+  user-select: none;
+}
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+}
+.card.puttable {
+  box-shadow: 0 0 15px 5px rgba(122, 224, 184, 0.6), 0 2px 6px rgba(0,0,0,0.2);
+  cursor: pointer;
+  animation: cardPulse 1.5s ease-in-out infinite;
+}
+.card.puttable:hover {
+  transform: translateY(-8px) scale(1.05);
+  box-shadow: 0 0 20px 8px rgba(122, 224, 184, 0.8), 0 8px 20px rgba(0,0,0,0.3);
+}
+@keyframes cardPulse {
+  0%, 100% { box-shadow: 0 0 15px 5px rgba(122, 224, 184, 0.5); }
+  50% { box-shadow: 0 0 20px 8px rgba(122, 224, 184, 0.8); }
+}
+
+.card-back {
+  display: inline-block;
+  padding: 12px 16px;
+  background: linear-gradient(145deg, #2a3a5a 0%, #1a2a4a 100%);
+  color: #8899bb;
+  border-radius: 10px;
+  font-size: 16px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.suit-red { color: #d1182a; }
+.suit-black { color: #1a1a2e; }
+
+/* ===== ターン表示の改善 ===== */
+.turn-hot {
+  background: linear-gradient(145deg, #1a3a2a 0%, #2a5a4a 100%) !important;
+  border: 2px solid #4ade80 !important;
+  box-shadow: 0 0 20px rgba(74, 222, 128, 0.4), 0 0 40px rgba(74, 222, 128, 0.2);
+  animation: turnGlow 2s ease-in-out infinite;
+}
+@keyframes turnGlow {
+  0%, 100% { box-shadow: 0 0 20px rgba(74, 222, 128, 0.4); }
+  50% { box-shadow: 0 0 30px rgba(74, 222, 128, 0.6), 0 0 50px rgba(74, 222, 128, 0.3); }
+}
+
+/* ターンバナー */
+.turn-banner {
+  display: none;
+  background: linear-gradient(90deg, #10b981 0%, #34d399 50%, #10b981 100%);
+  background-size: 200% 100%;
+  color: #fff;
+  font-weight: bold;
+  font-size: 16px;
+  padding: 8px 20px;
+  border-radius: 20px;
+  margin-bottom: 10px;
+  animation: bannerSlide 2s linear infinite, bannerPop 0.5s ease-out;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.5);
+}
+.turn-banner.active {
+  display: inline-block;
+}
+@keyframes bannerSlide {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@keyframes bannerPop {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* 他プレイヤーのターン表示 */
+.opponent-turn-indicator {
+  display: none;
+  background: #f59e0b;
+  color: #fff;
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  margin-left: 8px;
+  animation: pulse 1s ease-in-out infinite;
+}
+.opponent-turn-indicator.active {
+  display: inline-block;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* マーク選択 */
+.suit-select {
+  margin-top: 15px;
+  padding: 15px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 10px;
+  animation: flash 1s ease-in-out infinite alternate;
+}
+.suit-btn {
+  margin: 8px;
+  padding: 15px 24px;
+  border-radius: 12px;
+  border: 2px solid #999;
+  cursor: pointer;
+  font-size: 28px;
+  transition: all 0.2s ease;
+}
+.suit-btn:hover {
+  transform: scale(1.1);
+}
+.suit-btn.red {
+  color: #d1182a;
+  background: linear-gradient(145deg, #fff0f0 0%, #ffe0e0 100%);
+  border-color: #f99;
+}
+.suit-btn.black {
+  color: #1a1a2e;
+  background: linear-gradient(145deg, #f5f5f5 0%, #e5e5e5 100%);
+  border-color: #ccc;
+}
+
+/* スコアボード */
+.scoreboard {
+  background: linear-gradient(145deg, #11263a 0%, #1a3050 100%);
+  border-radius: 12px;
+  padding: 15px;
+  margin: 15px auto;
+  max-width: 980px;
+}
+.ranktable {
+  margin: auto;
+  border-collapse: collapse;
+  color: #fff;
+  width: 90%;
+}
+.ranktable td, .ranktable th {
+  border-bottom: 1px solid #335;
+  padding: 10px 12px;
+}
+.ranktable th {
+  background: #1b2e50;
+}
+.ranktable tr:hover td {
+  background: rgba(74,163,255,0.1);
+}
+
+/* 勝者表示 */
+.winner {
+  background: linear-gradient(145deg, #103020 0%, #1a4a30 100%);
+  border: 2px solid #4ade80;
+  color: #9f9;
+  padding: 15px;
+  margin: 15px auto;
+  border-radius: 12px;
+  max-width: 980px;
+}
+
+@keyframes flash {
+  from { opacity: 0.7; transform: scale(1); }
+  to { opacity: 1; transform: scale(1.02); }
+}
+
+/* 終局オーバーレイ */
+#resultOverlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9998;
+  background: rgba(0,0,0,.75);
+  backdrop-filter: blur(6px);
+}
+#resultCard {
+  background: linear-gradient(145deg, #0f2136 0%, #1a3050 100%);
+  border: 3px solid #4aa3ff;
+  border-radius: 20px;
+  padding: 30px;
+  max-width: 760px;
+  width: 92%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  transform: scale(.9);
+  opacity: 0;
+  animation: popIn .4s ease-out forwards;
+}
+#resultTitle {
+  font-size: 48px;
+  letter-spacing: .15em;
+  margin: 0 0 12px;
+  text-shadow: 0 4px 20px rgba(74,163,255,0.5);
+}
+#resultSub {
+  font-size: 18px;
+  color: #cde6ff;
+  margin: 0 0 20px;
+}
+@keyframes popIn {
+  to { transform: scale(1); opacity: 1; }
+}
+
+.title-tsumo {
+  color: #4aa3ff;
+  text-shadow: 0 0 15px rgba(74,163,255,.7), 0 0 30px rgba(74,163,255,.4);
+  animation: tsumoPop .6s ease-out;
+}
+@keyframes tsumoPop {
+  0% { transform: scale(.8); opacity: .3; }
+  60% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+.title-ron {
+  color: #ff4a4a;
+  text-shadow: 0 0 15px rgba(255,74,74,.6), 0 0 30px rgba(255,74,74,.3);
+  animation: ronShake .4s ease-in-out, ronPulse 1.2s ease-in-out .4s infinite;
+}
+@keyframes ronShake {
+  0%,100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(2px); }
+}
+@keyframes ronPulse {
+  0%,100% { text-shadow: 0 0 10px rgba(255,74,74,.5); }
+  50% { text-shadow: 0 0 25px rgba(255,74,74,.9); }
+}
+
+/* 山札表示 */
+#deckInfo {
+  font-size: 18px;
+  margin: 10px 0;
+  padding: 8px 16px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 8px;
+  display: inline-block;
+}
+
+/* 場のカード */
+.field-card {
+  display: inline-block;
+  padding: 20px 28px;
+  font-size: 28px;
+  font-weight: bold;
+  background: linear-gradient(145deg, #fff 0%, #f0f0f0 100%);
+  border-radius: 14px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3), 0 0 30px rgba(74,163,255,0.2);
+}
+
+/* デモ用コントロール */
+.demo-controls {
+  background: linear-gradient(145deg, #2a1a3a 0%, #3a2a5a 100%);
+  border: 2px solid #8b5cf6;
+  border-radius: 12px;
+  padding: 15px;
+  margin: 15px auto;
+  max-width: 980px;
+}
+.demo-controls h3 {
+  margin: 0 0 10px;
+  color: #c4b5fd;
+}
+.demo-btn {
+  background: linear-gradient(145deg, #6d28d9 0%, #8b5cf6 100%);
+  border-color: #a78bfa;
+}
+.demo-btn:hover {
+  background: linear-gradient(145deg, #7c3aed 0%, #a78bfa 100%);
+}
+</style>
+</head>
+<body>
+<h1>Free Eight</h1>
+<p class="muted">スタンドアロン デモ版（ローカルで動作確認用）</p>
+
+<!-- デモ用コントロール -->
+<div class="demo-controls">
+  <h3>デモ操作</h3>
+  <button class="demo-btn" onclick="simulateTurn()">ターンを切り替え</button>
+  <button class="demo-btn" onclick="simulateWin('tsumo')">ツモ勝利</button>
+  <button class="demo-btn" onclick="simulateWin('ron')">ロン勝利</button>
+  <button class="demo-btn" onclick="resetDemo()">リセット</button>
+</div>
+
+<div class="panel">
+  ルーム: <strong>demo-room</strong> /
+  状態: <span id="gameStatus">プレイ中</span> /
+  参加者: 3
+</div>
+
+<div id="deckInfo" class="muted">山札: 32 枚</div>
+<div id="gameArea"></div>
+
+<div id="scoreBoard" class="scoreboard"></div>
+
+<!-- 終局オーバーレイ -->
+<div id="resultOverlay">
+  <div id="resultCard">
+    <div id="resultTitle">ツモ</div>
+    <div id="resultSub"></div>
+    <div id="resultTable"></div>
+    <div><button id="resultClose" onclick="closeResult()">閉じる</button></div>
+  </div>
+</div>
+
+<script>
+// デモ用ゲーム状態
+let gameState = {
+  currentTurn: 0,
+  players: [
+    { seat: 1, name: "あなた", hand: ["A♠", "K♥", "8♦", "3♣", "J♠"] },
+    { seat: 2, name: "Player2", handCount: 4 },
+    { seat: 3, name: "Player3", handCount: 6 }
+  ],
+  discardTop: "Q♥",
+  deckCount: 32,
+  requiredSuit: null,
+  pendingSuitChooser: null,
+  sessionScores: [0, 0, 0],
+  lastRoundScores: [0, 0, 0]
+};
+
+function cardSpan(card, isField = false) {
+  const r = card.replace(/[♠♥♦♣]/g, "");
+  const s = (card.match(/[♠♥♦♣]/) || [""])[0];
+  const colorClass = (s === "♥" || s === "♦") ? "suit-red" : "suit-black";
+  const baseClass = isField ? "field-card" : "card";
+  return `<span class="${baseClass} ${colorClass}">${r}${s}</span>`;
+}
+
+function canPlayCard(card, topCard, requiredSuit) {
+  const cardSuit = (card.match(/[♠♥♦♣]/) || [""])[0];
+  const cardRank = card.replace(/[♠♥♦♣]/g, "");
+  const topSuit = (topCard.match(/[♠♥♦♣]/) || [""])[0];
+  const topRank = topCard.replace(/[♠♥♦♣]/g, "");
+
+  if (cardRank === "8") return true;
+  if (requiredSuit) return cardSuit === requiredSuit;
+  return cardSuit === topSuit || cardRank === topRank;
+}
+
+function render() {
+  const isMyTurn = gameState.currentTurn === 0;
+
+  let html = `<div class="panel"><b>場:</b> ${cardSpan(gameState.discardTop, true)}`;
+  if (gameState.requiredSuit) {
+    html += `<span style="color:#ffd166;font-weight:bold;margin-left:12px;">指定マーク: ${gameState.requiredSuit}</span>`;
+  }
+  html += `</div>`;
+
+  // マーク選択
+  if (gameState.pendingSuitChooser === 1) {
+    html += `<div class="suit-select"><p><strong>8 のマークを選択：</strong></p>
+      <button class="suit-btn black" onclick="chooseSuit('♠')">♠</button>
+      <button class="suit-btn red" onclick="chooseSuit('♥')">♥</button>
+      <button class="suit-btn red" onclick="chooseSuit('♦')">♦</button>
+      <button class="suit-btn black" onclick="chooseSuit('♣')">♣</button>
+    </div>`;
+  }
+
+  // プレイヤーパネル
+  gameState.players.forEach((p, idx) => {
+    const isTurn = idx === gameState.currentTurn;
+    const hot = isTurn ? " turn-hot" : "";
+
+    if (p.seat === 1) {
+      // 自分
+      const cards = p.hand.map((c, i) => {
+        const canPlay = isMyTurn && canPlayCard(c, gameState.discardTop, gameState.requiredSuit);
+        const puttableClass = canPlay ? " puttable" : "";
+        const colorClass = (c.includes("♥") || c.includes("♦")) ? "suit-red" : "suit-black";
+        return `<span class="card ${colorClass}${puttableClass}" data-idx="${i}" onclick="playCard(${i})">${c}</span>`;
+      }).join("");
+
+      html += `<div class="panel${hot}">
+        <div class="turn-banner ${isTurn ? 'active' : ''}">あなたのターン！</div>
+        <b style="font-size:18px;">${p.name} (You)</b>
+        <br>
+        <div id="my-hand" style="margin:12px 0;">${cards}</div>
+        <div style="margin-top:10px;">
+          <button id="drawBtn" onclick="drawCard()" ${!isTurn ? 'disabled' : ''} style="padding:12px 24px;font-size:16px;">カードを引く</button>
+        </div>
+      </div>`;
+    } else {
+      // 他プレイヤー
+      html += `<div class="panel${hot}">
+        <b style="font-size:16px;">${p.name}</b>
+        <span class="opponent-turn-indicator ${isTurn ? 'active' : ''}">思考中...</span>
+        <br>
+        <span class="card-back" style="margin-top:8px;display:inline-block;">×${p.handCount}</span>
+      </div>`;
+    }
+  });
+
+  document.getElementById("gameArea").innerHTML = html;
+  document.getElementById("deckInfo").textContent = `山札: ${gameState.deckCount} 枚`;
+
+  // スコアボード
+  renderScoreBoard();
+}
+
+function renderScoreBoard() {
+  const now = new Date();
+  const timeStr = now.toLocaleString("ja-JP", {
+    month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit"
+  });
+
+  let html = `
+    <div style="margin:4px 0 10px;">
+      <b>ルーム:</b> demo-room
+      <span style="font-size:0.9em;opacity:0.7;margin-left:10px;">(${timeStr})</span>
+    </div>
+    <b style="font-size:18px;">総合スコア</b><br>
+    <table class="ranktable">
+      <tr><th>順位</th><th>プレイヤー</th><th>今回</th><th>合計</th></tr>`;
+
+  gameState.players.forEach((p, idx) => {
+    const delta = gameState.lastRoundScores[idx];
+    const total = gameState.sessionScores[idx];
+    const deltaStr = delta === 0 ? "±0" : (delta > 0 ? `+${delta}` : `${delta}`);
+    const deltaColor = delta > 0 ? 'color:#4ade80;' : (delta < 0 ? 'color:#f87171;' : '');
+    html += `<tr><td>${idx + 1}</td><td>${p.name}</td><td style="${deltaColor}">${deltaStr}</td><td>${total}</td></tr>`;
+  });
+
+  html += "</table>";
+  document.getElementById("scoreBoard").innerHTML = html;
+}
+
+// デモ操作
+function simulateTurn() {
+  gameState.currentTurn = (gameState.currentTurn + 1) % gameState.players.length;
+  render();
+}
+
+function playCard(idx) {
+  if (gameState.currentTurn !== 0) return;
+
+  const player = gameState.players[0];
+  const card = player.hand[idx];
+
+  if (!canPlayCard(card, gameState.discardTop, gameState.requiredSuit)) {
+    alert("このカードは出せません！");
+    return;
+  }
+
+  // カードを出す
+  player.hand.splice(idx, 1);
+  gameState.discardTop = card;
+  gameState.requiredSuit = null;
+
+  // 8を出した場合
+  const rank = card.replace(/[♠♥♦♣]/g, "");
+  if (rank === "8") {
+    gameState.pendingSuitChooser = 1;
+    render();
+    return;
+  }
+
+  // 勝利チェック
+  if (player.hand.length === 0) {
+    simulateWin('tsumo');
+    return;
+  }
+
+  gameState.currentTurn = 1;
+  render();
+
+  // CPUの自動ターン
+  setTimeout(cpuTurn, 1500);
+}
+
+function drawCard() {
+  if (gameState.currentTurn !== 0) return;
+  if (gameState.deckCount <= 0) return;
+
+  const suits = ['♠', '♥', '♦', '♣'];
+  const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  const newCard = ranks[Math.floor(Math.random() * ranks.length)] + suits[Math.floor(Math.random() * suits.length)];
+
+  gameState.players[0].hand.push(newCard);
+  gameState.deckCount--;
+  gameState.currentTurn = 1;
+  render();
+
+  // CPUの自動ターン
+  setTimeout(cpuTurn, 1500);
+}
+
+function chooseSuit(suit) {
+  gameState.requiredSuit = suit;
+  gameState.pendingSuitChooser = null;
+  gameState.currentTurn = 1;
+  render();
+
+  // CPUの自動ターン
+  setTimeout(cpuTurn, 1500);
+}
+
+function cpuTurn() {
+  if (gameState.currentTurn === 0) return;
+
+  const cpuIdx = gameState.currentTurn;
+  const cpu = gameState.players[cpuIdx];
+
+  // CPUが1枚カードを出す（または引く）
+  if (Math.random() < 0.6 && cpu.handCount > 1) {
+    cpu.handCount--;
+    const suits = ['♠', '♥', '♦', '♣'];
+    const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+    gameState.discardTop = ranks[Math.floor(Math.random() * ranks.length)] + suits[Math.floor(Math.random() * suits.length)];
+    gameState.requiredSuit = null;
+  } else {
+    cpu.handCount++;
+    gameState.deckCount--;
+  }
+
+  gameState.currentTurn = (gameState.currentTurn + 1) % gameState.players.length;
+  render();
+
+  // 次もCPUならさらに実行
+  if (gameState.currentTurn !== 0) {
+    setTimeout(cpuTurn, 1500);
+  }
+}
+
+function simulateWin(type) {
+  const overlay = document.getElementById("resultOverlay");
+  const title = document.getElementById("resultTitle");
+  const sub = document.getElementById("resultSub");
+  const table = document.getElementById("resultTable");
+
+  title.className = "";
+
+  if (type === 'tsumo') {
+    title.textContent = "ツモ";
+    title.classList.add("title-tsumo");
+    sub.textContent = "Winner: あなた";
+    gameState.sessionScores[0] += 60;
+    gameState.sessionScores[1] -= 30;
+    gameState.sessionScores[2] -= 30;
+    gameState.lastRoundScores = [60, -30, -30];
+  } else {
+    title.textContent = "ロン";
+    title.classList.add("title-ron");
+    sub.textContent = "Winner: あなた";
+    gameState.sessionScores[0] += 30;
+    gameState.sessionScores[1] -= 30;
+    gameState.lastRoundScores = [30, -30, 0];
+  }
+
+  table.innerHTML = `
+    <h3>得点内訳</h3>
+    <p>Player2 → あなた : 30 点 (${type === 'tsumo' ? 'ツモ' : 'ロン'})</p>
+    ${type === 'tsumo' ? '<p>Player3 → あなた : 30 点 (ツモ)</p>' : ''}
+  `;
+
+  overlay.style.display = "flex";
+  document.getElementById("gameStatus").textContent = "終了";
+  renderScoreBoard();
+}
+
+function closeResult() {
+  document.getElementById("resultOverlay").style.display = "none";
+}
+
+function resetDemo() {
+  gameState = {
+    currentTurn: 0,
+    players: [
+      { seat: 1, name: "あなた", hand: ["A♠", "K♥", "8♦", "3♣", "J♠"] },
+      { seat: 2, name: "Player2", handCount: 4 },
+      { seat: 3, name: "Player3", handCount: 6 }
+    ],
+    discardTop: "Q♥",
+    deckCount: 32,
+    requiredSuit: null,
+    pendingSuitChooser: null,
+    sessionScores: [0, 0, 0],
+    lastRoundScores: [0, 0, 0]
+  };
+  document.getElementById("gameStatus").textContent = "プレイ中";
+  render();
+}
+
+// 初期描画
+render();
+</script>
+</body>
+</html>
