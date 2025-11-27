@@ -111,6 +111,12 @@ input:focus {
   50% { box-shadow: 0 0 20px 8px rgba(122, 224, 184, 0.8); }
 }
 
+/* 特殊カードハイライト */
+.card.special-2 { border: 2px solid #ff6b6b; }
+.card.special-qs { border: 2px solid #9b59b6; }
+.card.special-57 { border: 2px solid #f39c12; }
+.card.special-8 { border: 2px solid #3498db; }
+
 .card-back {
   display: inline-block;
   padding: 12px 16px;
@@ -124,7 +130,7 @@ input:focus {
 .suit-red { color: #d1182a; }
 .suit-black { color: #1a1a2e; }
 
-/* ===== ターン表示の改善 ===== */
+/* ターン表示 */
 .turn-hot {
   background: linear-gradient(145deg, #1a3a2a 0%, #2a5a4a 100%) !important;
   border: 2px solid #4ade80 !important;
@@ -188,10 +194,18 @@ input:focus {
   background: linear-gradient(90deg, #dc2626 0%, #ef4444 100%);
   color: #fff;
   font-weight: bold;
-  padding: 6px 12px;
+  padding: 8px 16px;
   border-radius: 8px;
   margin-left: 10px;
-  animation: flash .8s ease-in-out infinite alternate;
+  animation: attackPulse .6s ease-in-out infinite alternate;
+  font-size: 16px;
+}
+.attack-field.qs-attack {
+  background: linear-gradient(90deg, #7c3aed 0%, #a78bfa 100%);
+}
+@keyframes attackPulse {
+  from { transform: scale(1); box-shadow: 0 0 10px rgba(220, 38, 38, 0.5); }
+  to { transform: scale(1.05); box-shadow: 0 0 20px rgba(220, 38, 38, 0.8); }
 }
 
 /* マーク選択 */
@@ -301,17 +315,23 @@ input:focus {
 }
 #ronBox {
   background: linear-gradient(145deg, #0f2136 0%, #1a3050 100%);
-  border: 2px solid #4aa3ff;
+  border: 2px solid #ff6b6b;
   border-radius: 16px;
   padding: 25px;
   max-width: 520px;
   width: 92%;
   box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+  animation: ronBoxPop 0.3s ease-out;
+}
+@keyframes ronBoxPop {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
 #ronBox h3 {
   margin: 0 0 12px;
-  font-size: 24px;
+  font-size: 28px;
   color: #ff6b6b;
+  text-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
 }
 
 /* 終局オーバーレイ */
@@ -410,6 +430,12 @@ input:focus {
   100% { transform: scale(1); filter: brightness(1); }
 }
 
+/* 山札切れ */
+.title-draw {
+  color: #94a3b8;
+  text-shadow: 0 0 10px rgba(148,163,184,.5);
+}
+
 /* 雷FX */
 #thunderFX {
   position: absolute;
@@ -466,10 +492,24 @@ input:focus {
   border-radius: 14px;
   box-shadow: 0 4px 15px rgba(0,0,0,0.3), 0 0 30px rgba(74,163,255,0.2);
 }
+
+/* 点数内訳 */
+.point-breakdown {
+  background: rgba(0,0,0,0.2);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 10px 0;
+  font-size: 14px;
+}
+.point-breakdown .formula {
+  color: #ffd166;
+  font-weight: bold;
+}
 </style>
 </head>
 <body>
-<h1>Free Eight</h1>
+<h1>🃏 Free Eight</h1>
+<p class="muted">オンラインマルチプレイ対戦 (2デック使用)</p>
 
 <div class="panel">
   ルーム: <input id="roomId" value="" placeholder="room123456" />
@@ -489,14 +529,15 @@ input:focus {
 <!-- RON モーダル -->
 <div id="ronModal">
   <div id="ronBox">
-    <h3>ロン条件一致</h3>
+    <h3>🀄 ロン可能！</h3>
     <div id="ronMsg" class="muted" style="margin:8px 0 12px"></div>
-    <div id="ronCard" style="margin:8px 0;"></div>
-    <div id="ronMyHand" style="margin:8px 0 12px;"></div>
-    <div id="ronTimer" class="muted" style="margin:8px 0 12px; font-size: 20px;"></div>
+    <div id="ronCard" style="margin:12px 0;"></div>
+    <div id="ronMyHand" style="margin:12px 0;"></div>
+    <div id="ronCalc" style="margin:12px 0; font-size:14px; color:#ffd166;"></div>
+    <div id="ronTimer" class="muted" style="margin:12px 0; font-size: 24px; font-weight: bold;"></div>
     <div>
-      <button id="ronYes" style="background: linear-gradient(145deg, #dc2626, #ef4444);">ロンする</button>
-      <button id="ronNo">続行する</button>
+      <button id="ronYes" style="background: linear-gradient(145deg, #dc2626, #ef4444); font-size: 18px; padding: 14px 28px;">🀄 ロンする</button>
+      <button id="ronNo" style="font-size: 16px; padding: 12px 24px;">続行する</button>
     </div>
   </div>
 </div>
@@ -595,19 +636,33 @@ input:focus {
     return p ? (p.name || `Player${p.seat}`) : `Player${seat}`;
   }
 
+  // カードの特殊効果クラスを取得
+  function getCardSpecialClass(card) {
+    const rank = card.replace(/[♠♥♦♣]/g, "");
+    const suit = (card.match(/[♠♥♦♣]/) || [""])[0];
+    
+    if (rank === '2') return 'special-2';
+    if (rank === 'Q' && suit === '♠') return 'special-qs';
+    if (rank === '5' || rank === '7') return 'special-57';
+    if (rank === '8') return 'special-8';
+    return '';
+  }
+
   function cardSpan(card, isField = false) {
     const r = card.replace(/[♠♥♦♣]/g, "");
     const s = (card.match(/[♠♥♦♣]/) || [""])[0];
     const colorClass = (s === "♥" || s === "♦") ? "suit-red" : "suit-black";
     const baseClass = isField ? "field-card" : "card";
-    return `<span class="${baseClass} ${colorClass}">${r}${s}</span>`;
+    const specialClass = getCardSpecialClass(card);
+    return `<span class="${baseClass} ${colorClass} ${specialClass}">${r}${s}</span>`;
   }
 
   function cardSpanPlayable(card, idx, can) {
     const r = card.replace(/[♠♥♦♣]/g, "");
     const s = (card.match(/[♠♥♦♣]/) || [""])[0];
     const colorClass = (s === "♥" || s === "♦") ? "suit-red" : "suit-black";
-    const cls = can ? `card ${colorClass} puttable` : `card ${colorClass}`;
+    const specialClass = getCardSpecialClass(card);
+    const cls = can ? `card ${colorClass} ${specialClass} puttable` : `card ${colorClass} ${specialClass}`;
     return `<span class="${cls}" data-idx="${idx}">${r}${s}</span>`;
   }
 
@@ -653,27 +708,43 @@ input:focus {
     const pane = document.getElementById("gameOverPane");
     if (!lastGame) { pane.innerHTML = ""; return; }
 
-    const kanaTitle = lastGame.reason === "TSUMO" || lastGame.reason === "ツモ" ? "ツモ" : "ロン";
-    const winners = [];
-    if (kanaTitle === "ツモ") {
-      if (lastGame.winnerSeat) winners.push(seatName(lastGame.winnerSeat));
-    } else {
-      const tos = new Set((lastGame.scores || []).filter(s => /RON|ロン/.test(s.reason || "")).map(s => s.toSeat));
-      for (const idx of tos) { winners.push(seatName((idx ?? 0) + 1)); }
+    const reason = lastGame.reason;
+    let winnerLine = "";
+    
+    if (reason === '山札切れ') {
+      winnerLine = "勝者なし";
+    } else if (lastGame.winnerSeat) {
+      winnerLine = `Winner: ${seatName(lastGame.winnerSeat)}`;
     }
-    const winnerLine = winners.length ? ` / Winner: ${winners.join(", ")}` : "";
 
-    let html = `<div class="winner"><b>Game Over</b> : ${kanaTitle}${winnerLine}</div>`;
+    let html = `<div class="winner"><b>Game Over</b> : ${reason} / ${winnerLine}</div>`;
+    
     if (lastGame.scores && lastGame.scores.length) {
       html += `<div class="panel"><b>得点内訳</b><br>`;
       html += lastGame.scores.map(s => `${seatName(s.fromSeat + 1)} → ${seatName(s.toSeat + 1)} : ${s.amount} 点 (${s.reason})`).join("<br>");
       html += `</div>`;
     }
+    
+    // 点数計算詳細
+    if (lastGame.pointBreakdown) {
+      const pb = lastGame.pointBreakdown;
+      html += `<div class="panel point-breakdown">
+        <b>計算詳細</b><br>
+        <span class="formula">
+          放銃者手札(${pb.loserHand}) + 出札(${pb.playedCard}) + ロン者手札(${pb.ronnerHand}) = ${pb.base}<br>
+          ${pb.base} × ${pb.multiplier} = <b>${pb.total}点</b>
+        </span>
+      </div>`;
+    }
+    
     if (lastGame.reveals && lastGame.reveals.length) {
-      html += `<div class="reveal"><h3>点数計算に使用した手札の開示</h3>`;
+      html += `<div class="reveal"><h3>手札開示</h3>`;
       lastGame.reveals.forEach(r => {
-        let label = r.role === "tsumo_winner" ? `${seatName(r.seat)}（勝者の手札）` :
-                    r.role === "ron_winner" ? `${seatName(r.seat)}（ロン者の手札）` :
+        let label = r.role === "tsumo_winner" ? `${seatName(r.seat)}（ツモ勝者）` :
+                    r.role === "ron_winner" ? `${seatName(r.seat)}（ロン勝者）` :
+                    r.role === "ron_gaeshi_winner" ? `${seatName(r.seat)}（ロン返し勝者）` :
+                    r.role === "ron_gaeshi_loser" ? `${seatName(r.seat)}（ロン返し敗者）` :
+                    r.role === "loser" ? `${seatName(r.seat)}（敗者）` :
                     `${seatName(r.seat)}`;
         html += `<div class="row"><b>${label}</b><div>${(r.hand || []).map(c => cardSpan(c)).join("")}</div></div>`;
       });
@@ -690,19 +761,18 @@ input:focus {
   const resultClose = document.getElementById("resultClose");
 
   function showResultOverlay(payload) {
-    const isTsumo = /^(TSUMO|ツモ)$/.test(payload.reason);
-    const hasRonReverse = Array.isArray(payload.scores) && payload.scores.some(s => /ロン返し/.test(s.reason || ""));
+    const reason = payload.reason;
     const titleEl = document.getElementById("resultTitle");
     const thunder = document.getElementById("thunderFX");
 
-    titleEl.classList.remove("title-tsumo", "title-ron", "title-ronrev");
+    titleEl.classList.remove("title-tsumo", "title-ron", "title-ronrev", "title-draw");
     thunder.style.display = "none";
     thunder.innerHTML = "";
 
-    if (isTsumo) {
+    if (reason === 'ツモ') {
       titleEl.textContent = "ツモ";
       titleEl.classList.add("title-tsumo");
-    } else if (hasRonReverse) {
+    } else if (reason === 'ロン返し') {
       titleEl.innerHTML = "ロン返し<br>発生！！";
       titleEl.classList.add("title-ronrev");
       thunder.style.display = "block";
@@ -711,30 +781,46 @@ input:focus {
         <div class="bolt b1" style="--r:-6deg;"></div>
         <div class="bolt b2" style="--r:5deg;"></div>
       `;
-    } else {
+    } else if (reason === 'ロン') {
       titleEl.textContent = "ロン";
       titleEl.classList.add("title-ron");
+    } else if (reason === '山札切れ') {
+      titleEl.textContent = "山札切れ";
+      titleEl.classList.add("title-draw");
     }
 
-    const winners = [];
-    if (isTsumo) {
-      if (payload.winnerSeat) winners.push(seatName(payload.winnerSeat));
-    } else {
-      const tos = new Set((payload.scores || []).filter(s => /RON|ロン/.test(s.reason || "")).map(s => s.toSeat));
-      for (const idx of tos) { winners.push(seatName((idx ?? 0) + 1)); }
+    let winnerLine = "";
+    if (reason === '山札切れ') {
+      winnerLine = "勝者なし - 引き分け";
+    } else if (payload.winnerSeat) {
+      winnerLine = `Winner: ${seatName(payload.winnerSeat)}`;
     }
-    resultSub.textContent = winners.length ? `Winner: ${winners.join(", ")}` : "";
+    resultSub.textContent = winnerLine;
 
     let html = "";
     if (payload.scores && payload.scores.length) {
-      html += `<h3>得点内訳</h3>`;
-      html += payload.scores.map(s => `${seatName(s.fromSeat + 1)} → ${seatName(s.toSeat + 1)} : ${s.amount} 点 (${s.reason})`).join("<br>");
+      html += `<h3>得点移動</h3>`;
+      html += payload.scores.map(s => `<div>${seatName(s.fromSeat + 1)} → ${seatName(s.toSeat + 1)} : <b>${s.amount}点</b> (${s.reason})</div>`).join("");
     }
+    
+    // 点数計算詳細
+    if (payload.pointBreakdown) {
+      const pb = payload.pointBreakdown;
+      html += `<div class="point-breakdown">
+        <b>計算式</b><br>
+        放銃者手札(${pb.loserHand}) + 出札(${pb.playedCard}) + ロン者手札(${pb.ronnerHand}) = ${pb.base}<br>
+        <span class="formula">${pb.base} × ${pb.multiplier}倍 = <b>${pb.total}点</b></span>
+      </div>`;
+    }
+    
     if (payload.reveals && payload.reveals.length) {
-      html += `<h3 style="margin-top:12px">点数計算に使用した手札</h3>`;
+      html += `<h3 style="margin-top:12px">手札開示</h3>`;
       html += payload.reveals.map(r => {
-        let label = r.role === "tsumo_winner" ? `${seatName(r.seat)}（勝者）` :
-                    r.role === "ron_winner" ? `${seatName(r.seat)}（ロン者）` :
+        let label = r.role === "tsumo_winner" ? `${seatName(r.seat)}（ツモ勝者）` :
+                    r.role === "ron_winner" ? `${seatName(r.seat)}（ロン勝者）` :
+                    r.role === "ron_gaeshi_winner" ? `${seatName(r.seat)}（ロン返し勝者）` :
+                    r.role === "ron_gaeshi_loser" ? `${seatName(r.seat)}（ロン返し敗者）` :
+                    r.role === "loser" ? `${seatName(r.seat)}（敗者）` :
                     `${seatName(r.seat)}`;
         return `<div style="margin:8px 0;"><b>${label}</b><div>${(r.hand || []).map(c => cardSpan(c)).join("")}</div></div>`;
       }).join("");
@@ -751,7 +837,7 @@ input:focus {
 
     document.getElementById("info").textContent =
       `${state.roomId} / ${state.started ? (state.finished ? "終了" : "プレイ中") : "待機中"} / 参加者:${(state.players || []).length}`;
-    document.getElementById("deckInfo").textContent = `山札: ${state.deckCount ?? 0} 枚`;
+    document.getElementById("deckInfo").textContent = `山札: ${state.deckCount ?? 0} 枚 (2デック)`;
 
     if (state.start?.awaiting) {
       startBtn.disabled = false;
@@ -771,7 +857,13 @@ input:focus {
 
     // 場のカード
     let html = `<div class="panel"><b>場:</b> ${state.discardTop ? cardSpan(state.discardTop, true) : "(なし)"}`;
-    if (state.forcedAttack) html += `<span class="attack-field">攻撃中 ×${state.forcedAttack.draw}枚！</span>`;
+    
+    // 攻撃状態表示
+    if (state.attackState && state.attackState.active) {
+      const attackClass = state.attackState.type === 'Q♠' ? 'attack-field qs-attack' : 'attack-field';
+      html += `<span class="${attackClass}">⚡ 攻撃中 ${state.attackState.type} ×${state.attackState.totalDraw}枚！</span>`;
+    }
+    
     if (state.requiredSuit) html += `<span style="color:#ffd166;font-weight:bold;margin-left:12px;">指定マーク: ${state.requiredSuit}</span>`;
     html += `</div>`;
 
@@ -797,12 +889,12 @@ input:focus {
           : `<span class="card-back">（手札なし）</span>`;
 
         return `<div class="panel${hot}" id="panel-seat-${p.seat}">
-          <div class="turn-banner ${isMyTurn ? 'active' : ''}">あなたのターン！</div>
+          <div class="turn-banner ${isMyTurn ? 'active' : ''}">🎯 あなたのターン！</div>
           <b style="font-size:18px;">${display} (You)</b>
           <br>
           <div id="my-hand" style="margin:12px 0;">${cards}</div>
           <div style="margin-top:10px;">
-            <button id="drawBtn" style="padding:12px 24px;font-size:16px;">カードを引く</button>
+            <button id="drawBtn" style="padding:12px 24px;font-size:16px;">🃏 カードを引く</button>
           </div>
         </div>`;
       } else {
@@ -822,6 +914,15 @@ input:focus {
     const myTurn = !!(me && me.isTurn);
     const drawBtn = document.getElementById("drawBtn");
     if (drawBtn) {
+      // 攻撃中は「引く」で攻撃ドロー
+      if (state.attackState && state.attackState.active && myTurn) {
+        drawBtn.textContent = `⚡ ${state.attackState.totalDraw}枚引く`;
+        drawBtn.style.background = 'linear-gradient(145deg, #dc2626, #ef4444)';
+      } else {
+        drawBtn.textContent = '🃏 カードを引く';
+        drawBtn.style.background = '';
+      }
+      
       drawBtn.onclick = () => {
         if (freezeActive) return;
         roomId && socket.emit("move", { roomId, move: { type: "draw" } });
@@ -866,6 +967,7 @@ input:focus {
   const ronYes = document.getElementById("ronYes");
   const ronNo = document.getElementById("ronNo");
   const ronMyHand = document.getElementById("ronMyHand");
+  const ronCalc = document.getElementById("ronCalc");
   let ronPending = null;
   let ronTickId = null;
 
@@ -873,16 +975,22 @@ input:focus {
     ronPending = { card, loserSeat, deadline: Number(deadline) || (Date.now() + 5000) };
     const who = (state?.players || []).find(p => p.seat === yourSeat)?.name || `Player${yourSeat}`;
     const loser = (state?.players || []).find(p => p.seat === loserSeat)?.name || `Player${loserSeat}`;
-    ronMsg.innerHTML = `<b>${who}</b>：<br>放銃者 ${loser}<br>ロンしますか？`;
-    ronCard.innerHTML = cardSpan(card, true);
+    
+    // カードの数字
+    const cardRank = card.replace(/[♠♥♦♣]/g, "");
+    let cardValue = cardRank === 'A' ? 1 : cardRank === 'J' ? 11 : cardRank === 'Q' ? 12 : cardRank === 'K' ? 13 : parseInt(cardRank, 10);
+    
+    ronMsg.innerHTML = `<b>${loser}</b> が出したカードの数字 <b>${cardValue}</b> と<br>あなたの手札合計が一致しています！`;
+    ronCard.innerHTML = `<div style="margin:8px 0;">出されたカード:</div>${cardSpan(card, true)}`;
     ronMyHand.innerHTML = `<b>あなたの手札：</b><br>${(myHand || []).map(c => cardSpan(c)).join(" ") || "(なし)"}`;
+    ronCalc.innerHTML = `ロン成立で<b>×2倍</b>の点数を獲得！<br><small>※ロン返しされると×4倍を支払います</small>`;
     ronModal.style.display = "flex";
 
     if (ronTickId) clearInterval(ronTickId);
     const tick = () => {
       const remain = Math.max(0, ronPending.deadline - Date.now());
       const sec = Math.ceil(remain / 1000);
-      ronTimer.textContent = `残り ${sec} 秒`;
+      ronTimer.textContent = `⏱ 残り ${sec} 秒`;
       if (remain <= 0) {
         socket.emit("move", { roomId, move: { type: "noRon" } });
         closeRon();
