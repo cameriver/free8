@@ -49,6 +49,49 @@
 - 発生した問題と対応
 - 次のPhaseの概要
 
+## ブランチ戦略
+
+### 原則: Phase単位でブランチを作成
+
+```
+main
+  └── feature/phase-0-railway-deploy
+  └── feature/phase-1-code-split
+  └── feature/phase-2-database
+  └── feature/phase-3-auth
+  └── feature/phase-4-persistence
+```
+
+### ブランチ運用ルール
+
+| ケース | ブランチ |
+|-------|---------|
+| ドキュメント・設定変更 | main 直接でOK |
+| 機能実装（Phase） | `feature/phase-X-xxx` |
+| バグ修正 | `fix/xxx` |
+
+### Phase開始時
+
+```bash
+# 新しいPhaseを開始
+git checkout main
+git pull origin main
+git checkout -b feature/phase-X-xxx
+```
+
+### Phase完了時
+
+```bash
+# mainにマージ
+git checkout main
+git merge feature/phase-X-xxx
+git push origin main
+# ブランチ削除（任意）
+git branch -d feature/phase-X-xxx
+```
+
+---
+
 ## 参照ドキュメント
 
 - `docs/plans/TASK_LIST.md` - タスクリスト（進捗管理）
