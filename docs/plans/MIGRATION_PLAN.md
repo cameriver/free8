@@ -1,5 +1,9 @@
 # 🚀 Free Eight Railway移行計画書
 
+> **重要**: この文書は 2024 年時点の Railway 移行計画の記録です。  
+> 最新の統合的な実装・移行計画は `docs/plans/実装計画書/移行計画書`（**Free Eight アカウント機能 統合実装計画書**）を参照してください。  
+> 本ファイルはインフラ移行（Railway + PostgreSQL）の背景資料として保存しています。
+
 **作成日**: 2024年  
 **対象**: Free Eight オンラインカードゲーム  
 **移行先**: Railway + PostgreSQL
