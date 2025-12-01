@@ -4,11 +4,11 @@
 
 🎮 **デモ**: https://freeeight-online-b6d905954038.herokuapp.com
 
-📖 **詳細ルール**: [GAME_MANUAL.md](./GAME_MANUAL.md)
+📖 **詳細ルール**: [GAME_MANUAL.md](./docs/manual/GAME_MANUAL.md)
 📝 **実装計画書一覧**:
-  - [Composer版](./実装計画比較用/IMPLEMENTATION_PLAN_Composer.md) — Render/Prismaベースのアカウント機能導入案
-  - [Gemini 3 Pro Preview版](./実装計画比較用/IMPLEMENTATION_PLAN_gemini-3-pro-preview.md) — MVC + Prisma構成案
-  - [Claude Opus 4版](./実装計画比較用/IMPLEMENTATION_PLAN_claude-opus-4.md) — Supabase認証連携案
+  - [Composer版](./docs/archive/実装計画比較用/Archive/IMPLEMENTATION_PLAN_Composer.md) — Render/Prismaベースのアカウント機能導入案
+  - [Gemini 3 Pro Preview版](./docs/archive/実装計画比較用/Archive/IMPLEMENTATION_PLAN_gemini-3-pro-preview.md) — MVC + Prisma構成案
+  - [Claude Opus 4版](./docs/archive/実装計画比較用/Archive/IMPLEMENTATION_PLAN_claude-opus-4.md) — Supabase認証連携案
 
 
 ---
@@ -119,13 +119,20 @@ Free Eightは、**トランプ2デック**を使ったオンライン対戦カ�
 
 ```
 Free Eight/
-├── package.json           # npm設定・依存関係
-├── server.js              # バックエンドサーバー（Express + Socket.IO）
-├── README.md              # プロジェクト概要（このファイル）
-├── GAME_MANUAL.md         # 詳細ゲームルール
-└── public/                # 静的ファイル
-    ├── index.html         # メインゲーム画面（オンライン版）
-    └── standalone.html    # スタンドアロンデモ版
+├── package.json                 # npm設定・依存関係
+├── server/
+│   └── index.js                 # バックエンドサーバー（Express + Socket.IO）
+├── docs/                        # ドキュメント類
+│   ├── manual/GAME_MANUAL.md
+│   ├── plans/
+│   │   ├── MIGRATION_PLAN.md
+│   │   └── 実装計画書/移行計画書
+│   └── archive/実装計画比較用/Archive/*.md
+├── public/
+│   ├── html/index.html          # メインゲーム画面（オンライン版）
+│   ├── html/standalone.html     # スタンドアロンデモ版
+│   └── assets/                  # 共有アセット
+└── README.md                    # プロジェクト概要（このファイル）
 ```
 
 ---

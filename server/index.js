@@ -6,8 +6,10 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(PUBLIC_DIR, 'html')));
+app.use('/assets', express.static(path.join(PUBLIC_DIR, 'assets')));
 
 // ゲーム状態管理
 const rooms = new Map();

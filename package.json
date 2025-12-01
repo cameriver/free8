@@ -2,10 +2,10 @@
   "name": "free-eight-online",
   "version": "1.0.0",
   "description": "Online multiplayer card game - Free Eight",
-  "main": "server.js",
+  "main": "server/index.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js"
+    "start": "node server/index.js",
+    "dev": "node server/index.js"
   },
   "keywords": [
     "card-game",
