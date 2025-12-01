@@ -5,6 +5,11 @@
 🎮 **デモ**: https://freeeight-online-b6d905954038.herokuapp.com
 
 📖 **詳細ルール**: [GAME_MANUAL.md](./GAME_MANUAL.md)
+📝 **実装計画書一覧**:
+  - [Composer版](./実装計画比較用/IMPLEMENTATION_PLAN_Composer.md) — Render/Prismaベースのアカウント機能導入案
+  - [Gemini 3 Pro Preview版](./実装計画比較用/IMPLEMENTATION_PLAN_gemini-3-pro-preview.md) — MVC + Prisma構成案
+  - [Claude Opus 4版](./実装計画比較用/IMPLEMENTATION_PLAN_claude-opus-4.md) — Supabase認証連携案
+
 
 ---
 

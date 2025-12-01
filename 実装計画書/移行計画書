@@ -1,0 +1,879 @@
+# 🎮 Free Eight アカウント機能 統合実装計画書
+
+**作成日**: 2025年12月  
+**対象**: Free Eight オンラインカードゲーム  
+**目的**: 複数プレイヤーのアカウント登録・認証機能追加  
+**ベース**: Composer + Claude Opus 4 ハイブリッドプラン
+
+---
+
+## 📋 目次
+
+1. [概要](#1-概要)
+2. [現状分析](#2-現状分析)
+3. [技術スタック選定](#3-技術スタック選定)
+4. [ディレクトリ構造](#4-ディレクトリ構造)
+5. [データベース設計](#5-データベース設計)
+6. [実装フェーズ](#6-実装フェーズ)
+7. [API設計](#7-api設計)
+8. [セキュリティ設計](#8-セキュリティ設計)
+9. [コスト見積もり](#9-コスト見積もり)
+10. [リスクと対策](#10-リスクと対策)
+11. [チェックリスト](#11-チェックリスト)
+
+---
+
+## 1. 概要
+
+### 1.1 目標
+
+- ユーザー名 + パスワードによるアカウント登録・認証機能を追加
+- ゲーム履歴とスコアの永続化
+- **ゲームロジックを純粋関数として分離**（テスト容易性向上）
+- 既存のゲストモードとの互換性維持
+- 非エンジニアでも保守しやすい構造
+
+### 1.2 前提条件
+
+- 非エンジニアが AI アシスタントと一緒に保守可能なシンプルな構成
+- コストとシンプルさを重視
+- 既存機能への影響を最小限に
+- MIGRATION_PLAN.md との整合性を維持
+
+---
+
+## 2. 現状分析
+
+### 2.1 現在の技術スタック
+
+| 項目 | 現在 | 移行後 |
+|-----|------|-------|
+| **ホスティング** | Heroku | Railway（推奨） |
+| **バックエンド** | Node.js + Express | 同じ |
+| **リアルタイム通信** | Socket.IO | 同じ |
+| **データベース** | なし（インメモリ） | PostgreSQL |
+| **認証** | なし（LocalStorage ID） | JWT + ユーザー名/パスワード |
+| **セッション管理** | インメモリ | JWT（トークンベース） |
+
+### 2.2 現在のコード構成
+
+```
+mzm/
+├── package.json
+├── server.js              # 867行の単一ファイル
+├── README.md
+├── GAME_MANUAL.md
+├── MIGRATION_PLAN.md
+└── public/
+    ├── index.html         # HTML + CSS + JS が混在
+    └── standalone.html
+```
+
+### 2.3 server.js の主要関数（867行）
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ server.js の構成                                            │
+├─────────────────────────────────────────────────────────────┤
+│ [L1-10]    初期化: Express, Socket.IO                       │
+│ [L12-101]  ゲームデータ: CARD_POINTS, デッキ生成, カード情報 │
+│ [L103-150] ルール判定: canPlayCard, getCardEffect           │
+│ [L152-248] ルーム管理: createRoom, dealCards, 状態取得      │
+│ [L250-275] 通信: broadcastState                            │
+│ [L277-510] 勝敗処理: handleTsumo, handleRon, ロン判定       │
+│ [L511-867] Socket.IOイベント: joinRoom, move, etc.         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 2.4 課題
+
+- ❌ サーバー再起動でゲーム状態が消失
+- ❌ ユーザーアカウント機能なし
+- ❌ スコア履歴の永続化なし
+- ❌ コードが単一ファイルに集約されていて保守が困難
+- ❌ テストが書きにくい（純粋関数として分離されていない）
+
+---
+
+## 3. 技術スタック選定
+
+### 3.1 ホスティング
+
+**推奨: Railway**（MIGRATION_PLAN.md と整合）
+
+| 項目 | Railway | Render | Heroku継続 |
+|-----|---------|--------|-----------|
+| **WebSocket** | ◎ 対応 | ◎ 対応 | ◎ 対応 |
+| **PostgreSQL** | ◎ 従量制 | ○ 90MB無料 | ○ Mini $5/月 |
+| **自動デプロイ** | ◎ GitHub連携 | ◎ GitHub連携 | ◎ GitHub連携 |
+| **月額コスト** | $10〜20/月 | $0〜14/月 | $12/月 |
+| **スリープ** | なし | 無料枠は15分 | なし |
+
+**選択理由**: 
+- MIGRATION_PLAN.md で Railway を推奨済み
+- WebSocket（Socket.IO）との相性が良い
+- 従量課金で小規模から始められる
+
+### 3.2 データベース
+
+**PostgreSQL + Prisma ORM**
+
+- **Prisma選定理由**:
+  - 型安全なクエリ
+  - マイグレーション管理が簡単
+  - Prisma StudioでGUIでDB確認可能（非エンジニア向け）
+  - スキーマ定義が1ファイルで完結
+
+### 3.3 認証方式
+
+**ユーザー名 + パスワード + JWT**
+
+| 観点 | メリット |
+|------|---------|
+| シンプルさ | メールアドレス不要 |
+| セキュリティ | bcryptでハッシュ化 |
+| ステートレス | JWT でセッション管理 |
+| 互換性 | ゲストモード維持可能 |
+
+> **将来の拡張**: 必要に応じてGoogleログイン等のソーシャルログインを追加可能
+
+---
+
+## 4. ディレクトリ構造
+
+### 4.1 提案する新しい構造
+
+```
+mzm/
+├── package.json
+├── .env.example              # 環境変数テンプレート
+├── .gitignore               # .envを除外
+├── README.md
+├── GAME_MANUAL.md
+├── MIGRATION_PLAN.md
+├── IMPLEMENTATION_PLAN.md   # この計画書
+│
+├── src/                     # サーバーサイド
+│   ├── index.js             # エントリーポイント（10行程度）
+│   ├── app.js               # Express + Socket.IO 初期化
+│   │
+│   ├── config/
+│   │   ├── env.js           # 環境変数読み込み
+│   │   └── database.js      # Prisma クライアント初期化
+│   │
+│   ├── game/                # ★ ゲームロジック（純粋関数）
+│   │   ├── deck.js          # デッキ生成・シャッフル
+│   │   ├── cards.js         # カード情報・点数計算
+│   │   ├── room.js          # ルーム状態管理
+│   │   ├── rules.js         # プレイ可否判定
+│   │   └── scoring.js       # 勝敗・スコア計算
+│   │
+│   ├── socket/              # WebSocket 処理
+│   │   ├── index.js         # Socket.IO イベント登録
+│   │   ├── auth.js          # JWT 検証ミドルウェア
+│   │   ├── room-handlers.js # 入室・退室・投票
+│   │   └── game-handlers.js # ゲーム操作（play, draw, ron）
+│   │
+│   ├── routes/              # REST API
+│   │   ├── auth.js          # 認証API（登録・ログイン）
+│   │   └── api.js           # その他API（履歴取得等）
+│   │
+│   ├── middleware/
+│   │   └── jwt.js           # JWT認証ミドルウェア
+│   │
+│   ├── utils/
+│   │   ├── password.js      # パスワードハッシュ化
+│   │   └── token.js         # JWT生成・検証
+│   │
+│   └── db/                  # データベース操作
+│       ├── users.js         # ユーザー CRUD
+│       └── games.js         # 対戦履歴 CRUD
+│
+├── prisma/
+│   ├── schema.prisma        # データベーススキーマ定義
+│   └── migrations/          # マイグレーションファイル（自動生成）
+│
+└── public/                  # フロントエンド
+    ├── index.html           # メインページ（構造のみに簡素化）
+    ├── standalone.html
+    │
+    ├── css/
+    │   └── style.css        # スタイル分離
+    │
+    └── js/
+        ├── main.js          # アプリ初期化・状態管理
+        ├── auth.js          # 認証UI（ログイン・登録フォーム）
+        ├── socket.js        # WebSocket 通信
+        ├── game.js          # ゲームUI操作
+        └── components/
+            ├── card.js      # カード描画
+            ├── modal.js     # モーダル表示
+            └── scoreboard.js # スコアボード
+```
+
+### 4.2 ディレクトリの役割
+
+| ディレクトリ | 責務 | 変更頻度 |
+|-------------|------|---------|
+| `src/game/` | **ゲームルール・計算ロジック（純粋関数）** | ルール変更時のみ |
+| `src/socket/` | WebSocket イベント処理 | 機能追加時 |
+| `src/routes/` | REST API エンドポイント | API追加時 |
+| `src/db/` | データベース操作 | スキーマ変更時 |
+| `public/js/` | UI・ユーザー操作 | UI改善時 |
+
+### 4.3 ゲームロジック分離の方針
+
+**現在の server.js からの関数移動先**:
+
+| 現在の場所 | 関数 | 移動先 |
+|-----------|------|--------|
+| L36-59 | `createDeck`, `shuffle` | `src/game/deck.js` |
+| L61-101 | `getCardInfo`, `getCardPoints`, `calculateHandPoints`, `calculateHandValue`, `getCardValue` | `src/game/cards.js` |
+| L103-150 | `canPlayCard`, `getCardEffect` | `src/game/rules.js` |
+| L152-179 | `createRoom`, `getRoom` | `src/game/room.js` |
+| L278-310 | `checkRonPossible`, `checkRonGaeshi` | `src/game/scoring.js` |
+| L312-509 | `handleTsumo`, `handleRon`, `handleDeckEmpty` | `src/game/scoring.js` |
+
+**純粋関数の利点**:
+- ✅ 単体テストが書きやすい
+- ✅ ルール変更時の影響範囲が明確
+- ✅ 再利用可能（将来的にスタンドアロン版と共有可能）
+
+---
+
+## 5. データベース設計
+
+### 5.1 Prismaスキーマ
+
+```prisma
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(uuid())
+  username      String   @unique
+  passwordHash  String
+  displayName   String?
+  totalScore    Int      @default(0)
+  gamesPlayed   Int      @default(0)
+  gamesWon      Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastLoginAt   DateTime?
+  
+  gameParticipants GameParticipant[]
+  
+  @@map("users")
+}
+
+model GameHistory {
+  id          String   @id @default(uuid())
+  roomId      String
+  startedAt   DateTime @default(now())
+  endedAt     DateTime?
+  winnerId    String?
+  winType     String?  // 'tsumo', 'ron', 'ron_gaeshi', 'draw'
+  playerCount Int
+  
+  participants GameParticipant[]
+  
+  @@index([winnerId])
+  @@index([endedAt(sort: Desc)])
+  @@map("game_history")
+}
+
+model GameParticipant {
+  id          String   @id @default(uuid())
+  gameId      String
+  odUserId      String?  // NULLならゲスト
+  guestId     String?  // ゲストの場合のclientId
+  displayName String   // 表示名（ユーザー名 or ゲスト名）
+  scoreChange Int      @default(0)
+  finalHand   String[] // 終了時の手札
+  seatNumber  Int
+  isWinner    Boolean  @default(false)
+  
+  game        GameHistory @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user        User?       @relation(fields: [userId], references: [id])
+  
+  @@index([userId])
+  @@map("game_participants")
+}
+```
+
+### 5.2 Row Level Security（PostgreSQL直接設定）
+
+Supabase を使わない場合でも、PostgreSQL の RLS を有効化してセキュリティを強化:
+
+```sql
+-- プロフィール更新は本人のみ（アプリケーション層でも制御）
+-- 将来的にRLS導入時の参考設計
+
+-- ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+-- CREATE POLICY "Users can update own profile"
+--   ON users FOR UPDATE
+--   USING (id = current_setting('app.current_user_id')::uuid);
+```
+
+### 5.3 テーブル説明
+
+| テーブル | 説明 | 主要カラム |
+|--------|------|-----------|
+| `users` | ユーザー情報 | username, passwordHash, totalScore |
+| `game_history` | ゲーム履歴 | roomId, winnerId, winType |
+| `game_participants` | 参加者情報 | userId/guestId, scoreChange, finalHand |
+
+---
+
+## 6. 実装フェーズ
+
+### Phase 0: 現状のままRailwayにデプロイ（0.5日）
+
+**目標**: コード変更を最小限にして、今のゲームをRailway上で安定して動かす
+
+| タスク | 詳細 | 工数 |
+|-------|------|------|
+| Railway アカウント作成 | GitHub連携 | 10分 |
+| リポジトリ接続 | 自動デプロイ設定 | 15分 |
+| 環境変数設定 | `PORT`, `NODE_ENV` | 10分 |
+| 動作確認 | WebSocket接続テスト | 30分 |
+
+**完了条件**:
+- [ ] Railway 上の URL からゲーム画面にアクセスできる
+- [ ] 複数ブラウザ / 端末から同じルームに入り、対戦できる
+- [ ] ログに Socket.IO のエラーが出ていない
+
+---
+
+### Phase 1: コード分割（2-3日）
+
+**目標**: 現在の `server.js` を保守しやすい構造に分割
+
+| タスク | 詳細 | 工数 |
+|-------|------|------|
+| ディレクトリ作成 | `src/`, `public/js/`, `public/css/` | 30分 |
+| ゲームロジック分離 | `deck.js`, `cards.js`, `rules.js`, `scoring.js` | 4時間 |
+| ルーム管理分離 | `room.js` | 1時間 |
+| Socket処理分離 | `room-handlers.js`, `game-handlers.js` | 3時間 |
+| エントリーポイント作成 | `src/index.js`, `src/app.js` | 1時間 |
+| 動作確認 | 既存機能が正常動作することを確認 | 2時間 |
+
+**成果物**: 分割後も現在と同じ動作をするコード
+
+#### 分割後の src/game/cards.js 例
+
+```javascript
+// src/game/cards.js - 純粋関数として実装
+
+const CARD_POINTS = {
+  'A': 0.1, '2': 4, '3': 0.3, '4': 0.4, '5': 2,
+  '6': 0.6, '7': 2, '8': 4, '9': 0.9,
+  '10': 1, 'J': 1, 'Q': 1, 'K': 1
+};
+const QUEEN_SPADE_POINTS = 5;
+
+/**
+ * カードからスートとランクを抽出
+ * @param {string} card - カード文字列 (例: "A♠")
+ * @returns {{ suit: string, rank: string }}
+ */
+function getCardInfo(card) {
+  const suit = (card.match(/[♠♥♦♣]/) || [''])[0];
+  const rank = card.replace(/[♠♥♦♣]/g, '');
+  return { suit, rank };
+}
+
+/**
+ * カードの点数を取得
+ * @param {string} card - カード文字列
+ * @returns {number} 点数
+ */
+function getCardPoints(card) {
+  const { suit, rank } = getCardInfo(card);
+  if (rank === 'Q' && suit === '♠') return QUEEN_SPADE_POINTS;
+  return CARD_POINTS[rank] || 0;
+}
+
+/**
+ * 手札の合計点数を計算
+ * @param {string[]} hand - 手札配列
+ * @returns {number} 合計点数
+ */
+function calculateHandPoints(hand) {
+  return hand.reduce((sum, card) => sum + getCardPoints(card), 0);
+}
+
+module.exports = {
+  CARD_POINTS,
+  QUEEN_SPADE_POINTS,
+  getCardInfo,
+  getCardPoints,
+  calculateHandPoints,
+  calculateHandValue,
+  getCardValue
+};
+```
+
+---
+
+### Phase 2: データベース導入（2-3日）
+
+**目標**: PostgreSQL接続とPrismaセットアップ
+
+| タスク | 詳細 | 工数 |
+|-------|------|------|
+| Prismaインストール | `npm install prisma @prisma/client` | 10分 |
+| スキーマ定義 | `prisma/schema.prisma`作成 | 2時間 |
+| Railway PostgreSQL追加 | ダッシュボードから追加 | 15分 |
+| マイグレーション実行 | `npx prisma migrate dev` | 30分 |
+| 接続テスト | ローカルDBで動作確認 | 1時間 |
+| 環境変数設定 | `.env`ファイル作成 | 15分 |
+| Prisma Studio確認 | `npx prisma studio` | 15分 |
+
+**成果物**: データベース接続が確立され、テーブルが作成済み
+
+---
+
+### Phase 3: 認証機能実装（3-4日）
+
+**目標**: ユーザー登録・ログイン機能
+
+| タスク | 詳細 | 工数 |
+|-------|------|------|
+| パスワードユーティリティ | `src/utils/password.js`作成 | 1時間 |
+| JWTユーティリティ | `src/utils/token.js`作成 | 1時間 |
+| 認証ミドルウェア | `src/middleware/jwt.js`作成 | 2時間 |
+| 認証API | `src/routes/auth.js`作成 | 4時間 |
+| フロントエンドUI | ログイン・登録フォーム | 3時間 |
+| Socket.IO認証連携 | JWT でユーザー識別 | 2時間 |
+| ゲスト互換維持 | ログインなしでもプレイ可能 | 1時間 |
+| 統合テスト | 認証フロー全体のテスト | 2時間 |
+
+**成果物**: ユーザー登録・ログインが動作する状態
+
+---
+
+### Phase 4: ゲーム状態の永続化（2-3日）
+
+**目標**: ゲーム終了時にDBに履歴を保存
+
+| タスク | 詳細 | 工数 |
+|-------|------|------|
+| DB保存モジュール | `src/db/games.js`作成 | 2時間 |
+| ゲーム終了時保存 | `scoring.js`にDB保存ロジック追加 | 3時間 |
+| ユーザースコア更新 | `users.totalScore`等の更新 | 2時間 |
+| 履歴表示API | `GET /api/games/history` | 2時間 |
+| フロントエンド表示 | 過去のゲーム履歴一覧 | 2時間 |
+| テスト | 永続化の動作確認 | 2時間 |
+
+**成果物**: ゲーム履歴がDBに保存され、スコアが更新される
+
+---
+
+## 7. API設計
+
+### 7.1 認証API
+
+#### POST `/api/auth/register`
+
+ユーザー登録
+
+**リクエスト**:
+```json
+{
+  "username": "player1",
+  "password": "password123",
+  "displayName": "プレイヤー1"
+}
+```
+
+**レスポンス** (成功 201):
+```json
+{
+  "success": true,
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": "uuid",
+    "username": "player1",
+    "displayName": "プレイヤー1"
+  }
+}
+```
+
+**レスポンス** (エラー 400):
+```json
+{
+  "success": false,
+  "error": "USERNAME_EXISTS",
+  "message": "このユーザー名は既に使用されています"
+}
+```
+
+#### POST `/api/auth/login`
+
+ログイン
+
+**リクエスト**:
+```json
+{
+  "username": "player1",
+  "password": "password123"
+}
+```
+
+**レスポンス**: 登録APIと同様
+
+#### GET `/api/auth/me`
+
+現在のユーザー情報取得（認証必須）
+
+**ヘッダー**:
+```
+Authorization: Bearer <JWT_TOKEN>
+```
+
+**レスポンス** (200):
+```json
+{
+  "id": "uuid",
+  "username": "player1",
+  "displayName": "プレイヤー1",
+  "totalScore": 150,
+  "gamesPlayed": 10,
+  "gamesWon": 3,
+  "createdAt": "2025-01-01T00:00:00Z"
+}
+```
+
+### 7.2 ゲーム履歴API
+
+#### GET `/api/games/history`
+
+過去のゲーム履歴取得（認証必須）
+
+**クエリパラメータ**:
+- `limit`: 取得件数（デフォルト: 10、最大: 50）
+- `offset`: オフセット（デフォルト: 0）
+
+**レスポンス**:
+```json
+{
+  "games": [
+    {
+      "id": "uuid",
+      "roomId": "room123456",
+      "startedAt": "2025-01-01T10:00:00Z",
+      "endedAt": "2025-01-01T10:15:00Z",
+      "winType": "tsumo",
+      "playerCount": 4,
+      "myResult": {
+        "scoreChange": 30,
+        "isWinner": true,
+        "seatNumber": 1
+      }
+    }
+  ],
+  "total": 10,
+  "hasMore": false
+}
+```
+
+#### GET `/api/games/ranking`
+
+ランキング取得（認証不要）
+
+**クエリパラメータ**:
+- `limit`: 取得件数（デフォルト: 10、最大: 100）
+- `period`: 期間（`all`, `monthly`, `weekly`）
+
+**レスポンス**:
+```json
+{
+  "ranking": [
+    {
+      "rank": 1,
+      "displayName": "プレイヤー1",
+      "totalScore": 500,
+      "gamesPlayed": 50,
+      "gamesWon": 20
+    }
+  ],
+  "period": "all",
+  "updatedAt": "2025-01-01T12:00:00Z"
+}
+```
+
+---
+
+## 8. セキュリティ設計
+
+### 8.1 パスワード管理
+
+| 項目 | 実装 |
+|------|------|
+| ハッシュ化 | bcrypt（salt rounds: 10） |
+| 平文保存 | **禁止**（絶対に保存しない） |
+| 最小長 | 8文字以上 |
+| バリデーション | フロントエンド + バックエンド両方 |
+
+```javascript
+// src/utils/password.js
+const bcrypt = require('bcrypt');
+const SALT_ROUNDS = 10;
+
+async function hashPassword(password) {
+  return bcrypt.hash(password, SALT_ROUNDS);
+}
+
+async function verifyPassword(password, hash) {
+  return bcrypt.compare(password, hash);
+}
+
+module.exports = { hashPassword, verifyPassword };
+```
+
+### 8.2 JWT管理
+
+| 項目 | 設定 |
+|------|------|
+| 有効期限 | 24時間 |
+| アルゴリズム | HS256 |
+| シークレットキー | 環境変数（32文字以上推奨） |
+| 保存場所 | LocalStorage（HttpOnly Cookie推奨だが簡素化） |
+
+```javascript
+// src/utils/token.js
+const jwt = require('jsonwebtoken');
+
+function generateToken(userId) {
+  return jwt.sign(
+    { id: userId },
+    process.env.JWT_SECRET,
+    { expiresIn: '24h' }
+  );
+}
+
+function verifyToken(token) {
+  return jwt.verify(token, process.env.JWT_SECRET);
+}
+
+module.exports = { generateToken, verifyToken };
+```
+
+### 8.3 SQLインジェクション対策
+
+- **Prisma使用**: Prisma が自動的にエスケープ処理
+- **パラメータ化クエリ**: 直接SQLを書かない
+- **入力バリデーション**: ユーザー名は英数字とアンダースコアのみ
+
+### 8.4 その他のセキュリティ対策
+
+| 対策 | 実装時期 | 詳細 |
+|------|---------|------|
+| HTTPS | Phase 0 | Railway/Render で自動対応 |
+| CORS | Phase 3 | 本番ドメインのみ許可 |
+| レート制限 | Phase 4以降 | express-rate-limit 導入 |
+| 入力バリデーション | Phase 3 | フロントエンド + バックエンド |
+| XSS対策 | Phase 1 | HTML エスケープ |
+
+---
+
+## 9. コスト見積もり
+
+### 9.1 Railway（推奨）
+
+| 項目 | 小規模（〜100人） | 中規模（〜500人） | 大規模（〜2000人） |
+|-----|----------------|----------------|-----------------|
+| **Webサービス** | $5/月 | $10/月 | $20/月 |
+| **PostgreSQL** | $5/月 | $10/月 | $20/月 |
+| **合計** | **$10/月** | **$20/月** | **$40/月** |
+
+### 9.2 代替案: Render
+
+| 項目 | 無料枠 | 有料プラン |
+|-----|-------|-----------|
+| **Webサービス** | 750時間/月（15分スリープ） | $7/月（常時起動） |
+| **PostgreSQL** | 90MB | $7/月（1GB） |
+| **合計** | **$0/月** | **$14/月** |
+
+**初期段階**: Render 無料枠で運用可能（スリープ許容なら）  
+**成長後**: Railway $10〜20/月 で安定運用
+
+### 9.3 総コスト比較
+
+| 構成 | 初期 | 成長後 |
+|-----|------|-------|
+| Railway + PostgreSQL | $10/月 | $20〜40/月 |
+| Render + PostgreSQL | $0/月 | $14/月 |
+| Heroku継続 | $12/月 | $12/月 |
+
+---
+
+## 10. リスクと対策
+
+### 10.1 技術的リスク
+
+| リスク | 影響度 | 発生確率 | 対策 |
+|--------|-------|---------|------|
+| **DB接続エラー** | 高 | 中 | エラーハンドリング、リトライロジック |
+| **JWT漏洩** | 高 | 低 | HTTPS必須、短期間有効期限 |
+| **パスワード漏洩** | 高 | 低 | bcryptハッシュ化、平文保存禁止 |
+| **既存機能の破壊** | 高 | 中 | 段階的実装、既存機能のテスト維持 |
+| **コード分割ミス** | 中 | 中 | Phase 1 で十分なテスト |
+
+### 10.2 運用リスク
+
+| リスク | 影響度 | 対策 |
+|--------|-------|------|
+| **データベースバックアップ忘れ** | 高 | Railway/Render の自動バックアップ設定 |
+| **環境変数漏洩** | 高 | `.env`を`.gitignore`に追加、Railwayダッシュボードで管理 |
+| **デプロイ失敗** | 中 | ローカル環境での事前テスト、ロールバック手順 |
+| **サービス障害** | 中 | ステータスページ確認、インメモリフォールバック |
+
+### 10.3 スケーラビリティ
+
+| ユーザー数 | 必要な対策 |
+|-----------|-----------|
+| 〜100人 | 現在の構成で問題なし |
+| 〜1,000人 | PostgreSQL接続プール最適化 |
+| 〜5,000人 | Redis導入検討（セッション管理） |
+| 〜10,000人 | 複数サーバー + Socket.IO Redis Adapter |
+
+---
+
+## 11. チェックリスト
+
+### Phase 0: Railwayデプロイ
+
+- [ ] Railway アカウント作成・GitHub連携
+- [ ] 環境変数設定（`PORT`, `NODE_ENV`）
+- [ ] デプロイ成功
+- [ ] WebSocket接続確認
+- [ ] 複数ブラウザで対戦確認
+
+### Phase 1: コード分割
+
+- [ ] ディレクトリ構造作成
+- [ ] `src/game/deck.js` 作成（createDeck, shuffle）
+- [ ] `src/game/cards.js` 作成（getCardInfo, getCardPoints, 計算系）
+- [ ] `src/game/rules.js` 作成（canPlayCard, getCardEffect）
+- [ ] `src/game/room.js` 作成（createRoom, getRoom, dealCards）
+- [ ] `src/game/scoring.js` 作成（handleTsumo, handleRon, etc.）
+- [ ] `src/socket/` 作成（イベントハンドラ分離）
+- [ ] `src/index.js`, `src/app.js` 作成
+- [ ] 既存のゲーム機能が正常に動作することを確認
+- [ ] Railwayで動作確認
+
+### Phase 2: データベース導入
+
+- [ ] `npm install prisma @prisma/client`
+- [ ] `prisma/schema.prisma` 作成
+- [ ] Railway PostgreSQL追加
+- [ ] `DATABASE_URL` 環境変数設定
+- [ ] `npx prisma migrate dev` 実行
+- [ ] Prisma Studio でテーブル確認
+- [ ] 接続テスト成功
+
+### Phase 3: 認証機能実装
+
+- [ ] `src/utils/password.js` 作成（bcrypt）
+- [ ] `src/utils/token.js` 作成（JWT生成・検証）
+- [ ] `src/middleware/jwt.js` 作成（認証ミドルウェア）
+- [ ] `src/routes/auth.js` 作成
+  - [ ] POST `/api/auth/register`
+  - [ ] POST `/api/auth/login`
+  - [ ] GET `/api/auth/me`
+- [ ] フロントエンドにログインフォーム追加
+- [ ] フロントエンドに登録フォーム追加
+- [ ] Socket.IO認証連携
+- [ ] ゲストモードとの互換性確認
+- [ ] 認証フロー全体をテスト
+
+### Phase 4: ゲーム状態永続化
+
+- [ ] `src/db/games.js` 作成
+- [ ] `src/db/users.js` 作成
+- [ ] ゲーム終了時にDB保存処理を追加
+- [ ] ユーザースコア更新処理を追加
+- [ ] `GET /api/games/history` 実装
+- [ ] `GET /api/games/ranking` 実装（オプション）
+- [ ] 永続化の動作確認
+- [ ] サーバー再起動後のデータ保持確認
+
+### 最終確認
+
+- [ ] すべての機能が正常に動作
+- [ ] セキュリティチェック
+  - [ ] パスワードがハッシュ化されている
+  - [ ] JWTが正しく検証されている
+  - [ ] HTTPS が有効
+- [ ] エラーハンドリングの確認
+- [ ] パフォーマンステスト（DB接続数など）
+- [ ] ドキュメント更新（README.md）
+- [ ] MIGRATION_PLAN.md との整合性確認
+
+---
+
+## 12. 環境変数
+
+### `.env.example`
+
+```env
+# サーバー
+NODE_ENV=development
+PORT=3000
+
+# データベース
+DATABASE_URL="postgresql://user:password@localhost:5432/free_eight_dev"
+
+# JWT
+JWT_SECRET="your-super-secret-key-change-in-production-min-32-chars"
+
+# オプション（将来用）
+# REDIS_URL=redis://localhost:6379
+# SMTP_HOST=smtp.example.com
+# SMTP_USER=
+# SMTP_PASS=
+```
+
+### 設定手順
+
+1. `.env.example` をコピーして `.env` を作成
+2. 各値を実際の値に置き換え
+3. `.env` を `.gitignore` に追加（必須）
+4. Railway ダッシュボードで本番環境変数を設定
+
+---
+
+## 13. 工数サマリー
+
+| フェーズ | 工数目安 | 累計 |
+|---------|---------|------|
+| Phase 0: Railwayデプロイ | 0.5日 | 0.5日 |
+| Phase 1: コード分割 | 2-3日 | 2.5-3.5日 |
+| Phase 2: DB導入 | 2-3日 | 4.5-6.5日 |
+| Phase 3: 認証 | 3-4日 | 7.5-10.5日 |
+| Phase 4: 永続化 | 2-3日 | **9.5-13.5日** |
+
+※ 非エンジニアの方が AI アシスタントと一緒に進める場合の目安
+
+---
+
+## 14. 次のアクション
+
+1. **この計画書の確認** → 修正点があればフィードバック
+2. **Phase 0 開始** → Railway アカウント作成、現状のままデプロイ
+3. **Phase 1 開始** → `src/game/` ディレクトリ作成、純粋関数の分離から着手
+
+---
+
+**作成**: Claude（Composer + Claude Opus 4 ハイブリッド）  
+**最終更新**: 2025年12月
+
